@@ -1,8 +1,22 @@
-# Workspace
+# BigBankBonus — Mobile App
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Production-ready iOS/Android app for BigBankBonus.com built with Expo React Native. A full bank bonus discovery, tracking, and automation platform with AI agent, payment processing, and scheduling.
+
+**Live at:** BigBankBonus.com — Find. Apply. Earn.
+
+## Features
+
+- **Bank Search Engine** — 7,000+ banks/fintechs with EWS, minimum balance, bonus amount/%, and time-to-bonus filters
+- **AI Agent** — OpenAI GPT-4o-mini powered assistant with streaming SSE responses for bonus strategy
+- **Deposit/Withdrawal Calendar Scheduler** — Auto-schedules direct deposits across accounts
+- **Stripe Payment Processing** — $2k credit purchases at 0.75% fee
+- **Account & Routing Number Management** — Secure storage with expo-secure-store
+- **Performance Analytics** — ROI, earned/pending bonuses, deployment metrics
+- **Chrome Extension AutoFill Template** — Downloadable JSON for bank signup form autofill
+- **Apple/Google Auth + Biometrics + PIN** — Complete auth flow with expo-local-authentication
+- **Instagram Gradient Theme** — #833AB4 → #E1306C → #F77737 throughout
 
 ## Stack
 
@@ -10,11 +24,12 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Node.js version**: 24
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
+- **Mobile**: Expo 54 + React Native
 - **API framework**: Express 5
 - **Database**: PostgreSQL + Drizzle ORM
+- **AI**: OpenAI GPT-4o-mini via Replit integration
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+- **Build**: esbuild (CJS bundle) for API server
 
 ## Structure
 
