@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -13,6 +13,16 @@ export const docBonusesTable = pgTable("doc_bonuses", {
   category: text("category").notNull().default("bank"),
   pubDate: timestamp("pub_date"),
   fetchedAt: timestamp("fetched_at").defaultNow(),
+  offerLink: text("offer_link"),
+  docPostLink: text("doc_post_link"),
+  pullType: text("pull_type"),
+  ccFunding: text("cc_funding"),
+  directDepositInfo: text("direct_deposit_info"),
+  section: text("section"),
+  rank: integer("rank"),
+  source: text("source").default("rss"),
+  stateRestriction: text("state_restriction"),
+  nationwide: boolean("nationwide").default(false),
 });
 
 export const insertDocBonusSchema = createInsertSchema(docBonusesTable).omit({ id: true });

@@ -30,6 +30,15 @@ interface DoCBonus {
   bankName?: string;
   bonusAmount?: number;
   pubDate?: string;
+  offerLink?: string;
+  docPostLink?: string;
+  pullType?: string;
+  ccFunding?: string;
+  directDepositInfo?: string;
+  section?: string;
+  rank?: number;
+  nationwide?: boolean;
+  stateRestriction?: string;
 }
 
 function useDoCBonuses() {
@@ -40,7 +49,7 @@ function useDoCBonuses() {
     const domain = process.env.EXPO_PUBLIC_DOMAIN;
     const url = domain ? `https://${domain}/api/bonuses/doc` : "http://localhost:8080/api/bonuses/doc";
     setLoading(true);
-    fetch(url, { signal: AbortSignal.timeout(12000) })
+    fetch(url, { signal: AbortSignal.timeout(15000) })
       .then(r => r.json())
       .then(data => setBonuses(data.bonuses ?? []))
       .catch(() => {})
@@ -50,48 +59,85 @@ function useDoCBonuses() {
   return { bonuses, loading };
 }
 
+const SECTION_LABELS: Record<string, string> = {
+  checking: "Checking",
+  savings: "Savings",
+  business: "Business",
+  state: "State-Only",
+  regional: "Regional",
+};
+
 function DoCBonusCard({ bonus, isDark }: { bonus: DoCBonus; isDark: boolean }) {
   const c = isDark ? Colors.dark : Colors.light;
   const amount = bonus.bonusAmount;
-  const daysAgo = bonus.pubDate
-    ? Math.max(0, Math.floor((Date.now() - new Date(bonus.pubDate).getTime()) / 86400000))
-    : null;
+  const isSoft = bonus.pullType === "soft";
+  const isHard = bonus.pullType === "hard";
+  const needsDD = bonus.directDepositInfo && !bonus.directDepositInfo.toLowerCase().includes("not required");
+  const sectionLabel = bonus.section ? SECTION_LABELS[bonus.section] : null;
+  const targetUrl = bonus.offerLink ?? bonus.link;
 
   return (
     <Pressable
       style={[styles.docCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}
-      onPress={() => Linking.openURL(bonus.link).catch(() => {})}
+      onPress={() => Linking.openURL(targetUrl).catch(() => {})}
     >
-      <LinearGradient colors={["#833AB422", "#E1306C22"]} style={styles.docCardAccent} />
+      <LinearGradient colors={["#833AB4", "#E1306C"]} style={styles.docCardAccentBar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
       <View style={styles.docCardTop}>
-        {amount ? (
-          <View style={styles.docBonusBadge}>
-            <Text style={styles.docBonusAmount}>${amount}</Text>
-          </View>
-        ) : (
-          <View style={[styles.docBonusBadge, { backgroundColor: "#F7773722" }]}>
-            <Feather name="gift" size={12} color="#F77737" />
-          </View>
-        )}
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.docCardTitle, { color: c.text }]} numberOfLines={2}>{bonus.title}</Text>
-          {bonus.bankName && (
-            <Text style={[styles.docCardBank, { color: "#833AB4" }]}>{bonus.bankName}</Text>
+        <View style={styles.docAmountCol}>
+          {amount ? (
+            <>
+              <Text style={styles.docAmountVal}>${amount.toLocaleString()}</Text>
+              <Text style={[styles.docAmountLabel, { color: c.textSecondary }]}>bonus</Text>
+            </>
+          ) : (
+            <Feather name="gift" size={20} color="#833AB4" />
+          )}
+        </View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={[styles.docCardTitle, { color: c.text }]} numberOfLines={2}>{bonus.bankName ?? bonus.title}</Text>
+          {sectionLabel && (
+            <Text style={[styles.docSectionTag, { color: "#833AB4" }]}>{sectionLabel} Account</Text>
           )}
         </View>
         <Feather name="external-link" size={14} color={c.textTertiary} />
       </View>
-      {bonus.description && (
+
+      {bonus.description ? (
         <Text style={[styles.docCardDesc, { color: c.textSecondary }]} numberOfLines={2}>{bonus.description}</Text>
-      )}
+      ) : null}
+
+      <View style={styles.docBadgeRow}>
+        {bonus.pullType && (
+          <View style={[styles.docPillBadge, { backgroundColor: isSoft ? "#4CAF5020" : "#F4433620" }]}>
+            <Feather name={isSoft ? "check-circle" : "alert-circle"} size={10} color={isSoft ? "#4CAF50" : "#F44336"} />
+            <Text style={[styles.docPillText, { color: isSoft ? "#4CAF50" : "#F44336" }]}>{isSoft ? "Soft Pull" : "Hard Pull"}</Text>
+          </View>
+        )}
+        {needsDD ? (
+          <View style={[styles.docPillBadge, { backgroundColor: "#FF980020" }]}>
+            <Feather name="arrow-down-circle" size={10} color="#FF9800" />
+            <Text style={[styles.docPillText, { color: "#FF9800" }]}>DD Required</Text>
+          </View>
+        ) : bonus.directDepositInfo ? (
+          <View style={[styles.docPillBadge, { backgroundColor: "#4CAF5015" }]}>
+            <Feather name="check" size={10} color="#4CAF50" />
+            <Text style={[styles.docPillText, { color: "#4CAF50" }]}>No DD</Text>
+          </View>
+        ) : null}
+        {bonus.stateRestriction && (
+          <View style={[styles.docPillBadge, { backgroundColor: "#9C27B015" }]}>
+            <Feather name="map-pin" size={10} color="#9C27B0" />
+            <Text style={[styles.docPillText, { color: "#9C27B0" }]} numberOfLines={1}>{bonus.stateRestriction}</Text>
+          </View>
+        )}
+      </View>
+
       <View style={styles.docCardFooter}>
-        <View style={[styles.docSourceBadge, { backgroundColor: "#4CAF5022" }]}>
-          <Text style={[styles.docSourceText, { color: "#4CAF50" }]}>DoctorOfCredit</Text>
+        <View style={[styles.docSourceBadge, { backgroundColor: "#833AB415" }]}>
+          <Text style={[styles.docSourceText, { color: "#833AB4" }]}>DoctorOfCredit</Text>
         </View>
-        {daysAgo !== null && (
-          <Text style={[styles.docAge, { color: c.textTertiary }]}>
-            {daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo}d ago`}
-          </Text>
+        {bonus.rank != null && (
+          <Text style={[styles.docAge, { color: c.textTertiary }]}>#{bonus.rank + 1} ranked</Text>
         )}
       </View>
     </Pressable>
@@ -403,15 +449,19 @@ const styles = StyleSheet.create({
   docLoading: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 16 },
   docLoadingText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   docScroll: { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
-  docCard: { width: 240, borderRadius: 14, borderWidth: 1, padding: 12, overflow: "hidden" },
-  docCardAccent: { position: "absolute", top: 0, left: 0, right: 0, height: 3 },
-  docCardTop: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 8 },
-  docBonusBadge: { backgroundColor: "#833AB422", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, alignItems: "center", justifyContent: "center" },
-  docBonusAmount: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#833AB4" },
-  docCardTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", lineHeight: 18, flex: 1 },
-  docCardBank: { fontSize: 11, fontFamily: "Inter_600SemiBold", marginTop: 2 },
-  docCardDesc: { fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 16, marginBottom: 8 },
-  docCardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  docCard: { width: 260, borderRadius: 16, borderWidth: 1, padding: 12, overflow: "hidden", gap: 8 },
+  docCardAccentBar: { position: "absolute", top: 0, left: 0, right: 0, height: 3 },
+  docCardTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  docAmountCol: { alignItems: "center", minWidth: 48 },
+  docAmountVal: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#00C853" },
+  docAmountLabel: { fontSize: 9, fontFamily: "Inter_400Regular", marginTop: -2 },
+  docCardTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", lineHeight: 18 },
+  docSectionTag: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  docCardDesc: { fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 16 },
+  docBadgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
+  docPillBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 20 },
+  docPillText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  docCardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 },
   docSourceBadge: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
   docSourceText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
   docAge: { fontSize: 10, fontFamily: "Inter_400Regular" },
