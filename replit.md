@@ -12,7 +12,8 @@ Production-ready iOS/Android app for BigBankBonus.com built with Expo React Nati
 - **AI Agent** — OpenAI GPT-4o-mini powered assistant with streaming SSE responses for bonus strategy
 - **Deposit/Withdrawal Calendar Scheduler** — Auto-schedules direct deposits across accounts
 - **Stripe Payment Processing** — $2k credit purchases at 0.75% fee
-- **Account & Routing Number Management** — Secure storage with expo-secure-store
+- **Autopay DD Scheduler** — Per-offer autopay button with account/routing modal, ROIC/APY display (1× and 3× monthly), full Stripe ACH cycle: CC charge → ACH push (5 biz days) → ACH pull → CC refund
+- **Account & Routing Number Management** — Double-entry verified account number, routing validation, masked display
 - **Performance Analytics** — ROI, earned/pending bonuses, deployment metrics
 - **Chrome Extension AutoFill Template** — Downloadable JSON for bank signup form autofill
 - **Apple/Google Auth + Biometrics + PIN** — Complete auth flow with expo-local-authentication

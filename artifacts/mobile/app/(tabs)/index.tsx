@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { BANKS, Bank, getEWSFreebanks, getNoMinimumBanks, sortByBonusAmount, sortByBonusPercentage, sortByTimeToBonus } from "@/constants/banks";
 import { useAccounts } from "@/context/AccountsContext";
+import AutopayModal, { calcAutopay } from "@/components/AutopayModal";
 
 interface DoCBonus {
   id: number;
@@ -69,78 +70,138 @@ const SECTION_LABELS: Record<string, string> = {
 
 function DoCBonusCard({ bonus, isDark }: { bonus: DoCBonus; isDark: boolean }) {
   const c = isDark ? Colors.dark : Colors.light;
+  const [autopayVisible, setAutopayVisible] = useState(false);
   const amount = bonus.bonusAmount;
   const isSoft = bonus.pullType === "soft";
-  const isHard = bonus.pullType === "hard";
   const needsDD = bonus.directDepositInfo && !bonus.directDepositInfo.toLowerCase().includes("not required");
   const sectionLabel = bonus.section ? SECTION_LABELS[bonus.section] : null;
   const targetUrl = bonus.offerLink ?? bonus.link;
 
+  // ROIC/APY — only when there's a bonus amount and no hard monthly minimum
+  const roic = amount && amount > 0 ? calcAutopay(amount) : null;
+
+  const handleAutopay = () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setAutopayVisible(true);
+  };
+
   return (
-    <Pressable
-      style={[styles.docCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}
-      onPress={() => Linking.openURL(targetUrl).catch(() => {})}
-    >
-      <LinearGradient colors={["#833AB4", "#E1306C"]} style={styles.docCardAccentBar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
-      <View style={styles.docCardTop}>
-        <View style={styles.docAmountCol}>
-          {amount ? (
-            <>
-              <Text style={styles.docAmountVal}>${amount.toLocaleString()}</Text>
-              <Text style={[styles.docAmountLabel, { color: c.textSecondary }]}>bonus</Text>
-            </>
-          ) : (
-            <Feather name="gift" size={20} color="#833AB4" />
-          )}
+    <>
+      <Pressable
+        style={[styles.docCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}
+        onPress={() => Linking.openURL(targetUrl).catch(() => {})}
+      >
+        <LinearGradient colors={["#833AB4", "#E1306C"]} style={styles.docCardAccentBar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+        <View style={styles.docCardTop}>
+          <View style={styles.docAmountCol}>
+            {amount ? (
+              <>
+                <Text style={styles.docAmountVal}>${amount.toLocaleString()}</Text>
+                <Text style={[styles.docAmountLabel, { color: c.textSecondary }]}>bonus</Text>
+              </>
+            ) : (
+              <Feather name="gift" size={20} color="#833AB4" />
+            )}
+          </View>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={[styles.docCardTitle, { color: c.text }]} numberOfLines={2}>{bonus.bankName ?? bonus.title}</Text>
+            {sectionLabel && (
+              <Text style={[styles.docSectionTag, { color: "#833AB4" }]}>{sectionLabel} Account</Text>
+            )}
+          </View>
+          {/* Autopay button — right side */}
+          <View style={{ gap: 6, alignItems: "flex-end" }}>
+            <Pressable
+              onPress={e => { e.stopPropagation(); handleAutopay(); }}
+              style={styles.autopayBtn}
+              hitSlop={8}
+            >
+              <LinearGradient colors={["#833AB4", "#E1306C"]} style={styles.autopayBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <Feather name="zap" size={11} color="#fff" />
+                <Text style={styles.autopayBtnText}>Autopay</Text>
+              </LinearGradient>
+            </Pressable>
+            <Feather name="external-link" size={13} color={c.textTertiary} />
+          </View>
         </View>
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={[styles.docCardTitle, { color: c.text }]} numberOfLines={2}>{bonus.bankName ?? bonus.title}</Text>
-          {sectionLabel && (
-            <Text style={[styles.docSectionTag, { color: "#833AB4" }]}>{sectionLabel} Account</Text>
-          )}
-        </View>
-        <Feather name="external-link" size={14} color={c.textTertiary} />
-      </View>
 
-      {bonus.description ? (
-        <Text style={[styles.docCardDesc, { color: c.textSecondary }]} numberOfLines={2}>{bonus.description}</Text>
-      ) : null}
-
-      <View style={styles.docBadgeRow}>
-        {bonus.pullType && (
-          <View style={[styles.docPillBadge, { backgroundColor: isSoft ? "#4CAF5020" : "#F4433620" }]}>
-            <Feather name={isSoft ? "check-circle" : "alert-circle"} size={10} color={isSoft ? "#4CAF50" : "#F44336"} />
-            <Text style={[styles.docPillText, { color: isSoft ? "#4CAF50" : "#F44336" }]}>{isSoft ? "Soft Pull" : "Hard Pull"}</Text>
-          </View>
-        )}
-        {needsDD ? (
-          <View style={[styles.docPillBadge, { backgroundColor: "#FF980020" }]}>
-            <Feather name="arrow-down-circle" size={10} color="#FF9800" />
-            <Text style={[styles.docPillText, { color: "#FF9800" }]}>DD Required</Text>
-          </View>
-        ) : bonus.directDepositInfo ? (
-          <View style={[styles.docPillBadge, { backgroundColor: "#4CAF5015" }]}>
-            <Feather name="check" size={10} color="#4CAF50" />
-            <Text style={[styles.docPillText, { color: "#4CAF50" }]}>No DD</Text>
-          </View>
+        {bonus.description ? (
+          <Text style={[styles.docCardDesc, { color: c.textSecondary }]} numberOfLines={2}>{bonus.description}</Text>
         ) : null}
-        {bonus.stateRestriction && (
-          <View style={[styles.docPillBadge, { backgroundColor: "#9C27B015" }]}>
-            <Feather name="map-pin" size={10} color="#9C27B0" />
-            <Text style={[styles.docPillText, { color: "#9C27B0" }]} numberOfLines={1}>{bonus.stateRestriction}</Text>
+
+        {/* ROIC / APY strip — only for offers with a dollar amount */}
+        {roic && (
+          <View style={[styles.roicStrip, { backgroundColor: isDark ? "#ffffff08" : "#f5f0ff" }]}>
+            <View style={styles.roicStat}>
+              <Text style={styles.roicVal}>${roic.ddAmount}</Text>
+              <Text style={[styles.roicLabel, { color: c.textTertiary }]}>DD/cycle</Text>
+            </View>
+            <View style={[styles.roicDivider, { backgroundColor: c.separator }]} />
+            <View style={styles.roicStat}>
+              <Text style={[styles.roicVal, { color: "#833AB4" }]}>{roic.apy1x.toLocaleString()}%</Text>
+              <Text style={[styles.roicLabel, { color: c.textTertiary }]}>1×/mo APY</Text>
+            </View>
+            <View style={[styles.roicDivider, { backgroundColor: c.separator }]} />
+            <View style={styles.roicStat}>
+              <Text style={[styles.roicVal, { color: "#E1306C" }]}>{roic.apy3x.toLocaleString()}%</Text>
+              <Text style={[styles.roicLabel, { color: c.textTertiary }]}>3×/mo APY</Text>
+            </View>
+            <View style={[styles.roicDivider, { backgroundColor: c.separator }]} />
+            <View style={styles.roicStat}>
+              <Text style={[styles.roicVal, { color: "#F77737" }]}>${roic.chargeAmount}</Text>
+              <Text style={[styles.roicLabel, { color: c.textTertiary }]}>+3% fee</Text>
+            </View>
           </View>
         )}
-      </View>
 
-      <View style={styles.docCardFooter}>
-        <View style={[styles.docSourceBadge, { backgroundColor: "#833AB415" }]}>
-          <Text style={[styles.docSourceText, { color: "#833AB4" }]}>DoctorOfCredit</Text>
+        <View style={styles.docBadgeRow}>
+          {bonus.pullType && (
+            <View style={[styles.docPillBadge, { backgroundColor: isSoft ? "#4CAF5020" : "#F4433620" }]}>
+              <Feather name={isSoft ? "check-circle" : "alert-circle"} size={10} color={isSoft ? "#4CAF50" : "#F44336"} />
+              <Text style={[styles.docPillText, { color: isSoft ? "#4CAF50" : "#F44336" }]}>{isSoft ? "Soft Pull" : "Hard Pull"}</Text>
+            </View>
+          )}
+          {needsDD ? (
+            <View style={[styles.docPillBadge, { backgroundColor: "#FF980020" }]}>
+              <Feather name="arrow-down-circle" size={10} color="#FF9800" />
+              <Text style={[styles.docPillText, { color: "#FF9800" }]}>DD Required</Text>
+            </View>
+          ) : bonus.directDepositInfo ? (
+            <View style={[styles.docPillBadge, { backgroundColor: "#4CAF5015" }]}>
+              <Feather name="check" size={10} color="#4CAF50" />
+              <Text style={[styles.docPillText, { color: "#4CAF50" }]}>No DD</Text>
+            </View>
+          ) : null}
+          {bonus.stateRestriction && (
+            <View style={[styles.docPillBadge, { backgroundColor: "#9C27B015" }]}>
+              <Feather name="map-pin" size={10} color="#9C27B0" />
+              <Text style={[styles.docPillText, { color: "#9C27B0" }]} numberOfLines={1}>{bonus.stateRestriction}</Text>
+            </View>
+          )}
         </View>
-        {bonus.rank != null && (
-          <Text style={[styles.docAge, { color: c.textTertiary }]}>#{bonus.rank + 1} ranked</Text>
-        )}
-      </View>
-    </Pressable>
+
+        <View style={styles.docCardFooter}>
+          <View style={[styles.docSourceBadge, { backgroundColor: "#833AB415" }]}>
+            <Text style={[styles.docSourceText, { color: "#833AB4" }]}>DoctorOfCredit</Text>
+          </View>
+          {bonus.rank != null && (
+            <Text style={[styles.docAge, { color: c.textTertiary }]}>#{bonus.rank + 1} ranked</Text>
+          )}
+        </View>
+      </Pressable>
+
+      {autopayVisible && (
+        <AutopayModal
+          visible={autopayVisible}
+          onClose={() => setAutopayVisible(false)}
+          bankName={bonus.bankName ?? bonus.title}
+          bonusAmount={amount ?? 0}
+          offerLink={bonus.offerLink ?? bonus.link}
+          bonusGuid={String(bonus.id)}
+          section={bonus.section}
+        />
+      )}
+    </>
   );
 }
 
@@ -467,4 +528,16 @@ const styles = StyleSheet.create({
   docAge: { fontSize: 10, fontFamily: "Inter_400Regular" },
   docDivider: { height: 1, marginHorizontal: 16, marginTop: 4, marginBottom: 12 },
   allBanksLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", paddingHorizontal: 16, paddingBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 },
+
+  // Autopay button
+  autopayBtn: { borderRadius: 8, overflow: "hidden" },
+  autopayBtnGrad: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 5 },
+  autopayBtnText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  // ROIC/APY strip
+  roicStrip: { flexDirection: "row", alignItems: "center", borderRadius: 10, paddingVertical: 6, paddingHorizontal: 8, marginTop: 6, marginBottom: 4, gap: 0 },
+  roicStat: { flex: 1, alignItems: "center" },
+  roicVal: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#333" },
+  roicLabel: { fontSize: 9, fontFamily: "Inter_400Regular", marginTop: 1 },
+  roicDivider: { width: 1, height: 24 },
 });
