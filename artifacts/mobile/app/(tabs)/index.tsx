@@ -49,12 +49,15 @@ function useDoCBonuses() {
   useEffect(() => {
     const domain = process.env.EXPO_PUBLIC_DOMAIN;
     const url = domain ? `https://${domain}/api/bonuses/doc` : "http://localhost:8080/api/bonuses/doc";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
     setLoading(true);
-    fetch(url, { signal: AbortSignal.timeout(15000) })
+    fetch(url, { signal: controller.signal })
       .then(r => r.json())
       .then(data => setBonuses(data.bonuses ?? []))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { clearTimeout(timer); setLoading(false); });
+    return () => { clearTimeout(timer); controller.abort(); };
   }, []);
 
   return { bonuses, loading };
