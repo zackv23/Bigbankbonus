@@ -1,22 +1,55 @@
 import { Router } from "express";
 import { db, docBonusesTable, type DocBonus } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, asc, isNull, or } from "drizzle-orm";
+import cron from "node-cron";
 
 const router = Router();
 
 const DOC_PAGE_URL = "https://www.doctorofcredit.com/best-bank-account-bonuses/";
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+// ─── Pinned (featured) offers — always shown at the top regardless of scrape ──
+const PINNED_OFFERS: Array<Omit<typeof docBonusesTable.$inferInsert, "id" | "fetchedAt">> = [
+  {
+    guid: "pinned-chase-checking-savings",
+    title: "Chase Total Checking® — Up to $300 Bonus",
+    link: "https://account.chase.com/consumer/banking/checkingandsavingsoffer",
+    offerLink: "https://account.chase.com/consumer/banking/checkingandsavingsoffer",
+    docPostLink: "https://www.doctorofcredit.com/chase-300-checking-bonus/",
+    bankName: "Chase",
+    bonusAmount: 300,
+    description: "Earn a $300 bonus when you open a Chase Total Checking® account and set up direct deposit. No minimum balance required after bonus is earned.",
+    pullType: "soft",
+    section: "checking",
+    rank: -1,
+    source: "pinned",
+    nationwide: true,
+    stateRestriction: null,
+    category: "bank",
+    ccFunding: null,
+    directDepositInfo: "Direct deposit required",
+    pinned: true,
+    pubDate: new Date(),
+  },
+];
+
+// ─── HTML helpers ─────────────────────────────────────────────────────────────
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, "").replace(/&#[0-9]+;/g, c => {
-    const code = parseInt(c.slice(2, -1), 10);
-    return String.fromCharCode(code);
-  }).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").replace(/&#038;/g, "&").replace(/&quot;/g, '"').trim();
+  return html
+    .replace(/<[^>]+>/g, "")
+    .replace(/&#([0-9]+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#038;/g, "&")
+    .replace(/&quot;/g, '"')
+    .trim();
 }
 
 function extractAmount(text: string): number | null {
-  const m = text.match(/\$([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:–|-|to|up to|or|\/|$|\s)/i)
-    ?? text.match(/\$([0-9][0-9,]*)/);
+  const m =
+    text.match(/\$([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:–|-|to|up to|or|\/|$|\s)/i) ??
+    text.match(/\$([0-9][0-9,]*)/);
   if (!m) return null;
   const n = parseFloat(m[1].replace(/,/g, ""));
   return isNaN(n) ? null : Math.round(n);
@@ -25,9 +58,9 @@ function extractAmount(text: string): number | null {
 function extractStateRestriction(title: string): string | null {
   const m = title.match(/^\[([^\]]+)\]/);
   if (!m) return null;
-  const t = m[1].toLowerCase();
-  if (t.includes("only") || t.includes(",") || /\b[A-Z]{2}\b/.test(m[1])) return m[1];
-  return null;
+  if (m[1].toLowerCase().includes("expired")) return null;
+  if (m[1].toLowerCase().includes("targeted")) return m[1].replace(/Targeted,?\s*/i, "").trim();
+  return m[1].trim();
 }
 
 function parseSectionName(h2Text: string): string {
@@ -46,99 +79,74 @@ function parseUlDetails(ulHtml: string): {
   directDepositInfo: string | null;
   docPostLink: string | null;
 } {
-  const liItems = [...ulHtml.matchAll(/<li[^>]*>(.*?)<\/li>/gis)].map(m => stripHtml(m[1]));
+  const liItems = [...ulHtml.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map(m => ({
+    text: stripHtml(m[1]),
+    raw: m[1],
+  }));
+
   let pullType: string | null = null;
   let ccFunding: string | null = null;
   let directDepositInfo: string | null = null;
   let docPostLink: string | null = null;
 
-  for (const li of liItems) {
-    const lower = li.toLowerCase();
-    if (lower.includes("read our") || lower.includes("read the full") || lower.includes("our post") || lower.includes("our full post")) {
-      const linkMatch = ulHtml.match(/href="(https:\/\/www\.doctorofcredit\.com[^"]+)"/i);
+  for (const { text, raw } of liItems) {
+    const lower = text.toLowerCase();
+    if (lower.includes("read our") || lower.includes("our post") || lower.includes("our full post")) {
+      const linkMatch = raw.match(/href="(https?:\/\/[^"]+)"/i);
       if (linkMatch) docPostLink = linkMatch[1];
       continue;
     }
-    if (lower.includes("soft pull") || lower.includes("hard pull")) {
-      pullType = lower.includes("hard pull") ? "hard" : "soft";
-    } else if (lower.includes("credit card") || lower.includes("cc funding") || lower.includes("debit card fund")) {
-      ccFunding = li;
+    if (lower.includes("soft pull")) pullType = "soft";
+    else if (lower.includes("hard pull")) pullType = "hard";
+    else if (lower.includes("credit card fund") || lower.includes("debit card fund") || lower.includes("no credit card") || lower.includes("can fund")) {
+      ccFunding = text;
     } else if (lower.includes("direct deposit") || lower.includes("no direct")) {
-      directDepositInfo = li;
+      directDepositInfo = text;
     }
   }
   return { pullType, ccFunding, directDepositInfo, docPostLink };
 }
 
-function parseDocPage(html: string): Array<{
-  guid: string;
-  title: string;
-  link: string;
-  description: string | null;
-  bankName: string | null;
-  bonusAmount: number | null;
-  offerLink: string | null;
-  docPostLink: string | null;
-  pullType: string | null;
-  ccFunding: string | null;
-  directDepositInfo: string | null;
-  section: string;
-  rank: number;
-  source: string;
-  stateRestriction: string | null;
-  nationwide: boolean;
-  category: string;
-}> {
-  const results: ReturnType<typeof parseDocPage> = [];
-
-  // Extract main content div
-  const contentMatch = html.match(/<div class="entry-content">([\s\S]*?)<\/div>\s*(?:<aside|<div class="post-footer|<section)/i);
+function parseDocPage(html: string): Array<typeof docBonusesTable.$inferInsert> {
+  const results: Array<typeof docBonusesTable.$inferInsert> = [];
+  const contentMatch = html.match(/<div class="entry-content">([\s\S]*?)(?=<\/article>|<div class="post-footer|<section class="related)/i);
   const content = contentMatch ? contentMatch[1] : html;
 
-  // Split by h2 to get sections
   const sectionParts = content.split(/<h2[^>]*>/i);
   let globalRank = 0;
 
   for (const sectionPart of sectionParts.slice(1)) {
-    // Get section name from h2 text
-    const h2TextMatch = sectionPart.match(/^(.*?)<\/h2>/is);
+    const h2TextMatch = sectionPart.match(/^([\s\S]*?)<\/h2>/i);
     if (!h2TextMatch) continue;
     const sectionName = parseSectionName(stripHtml(h2TextMatch[1]));
+    if (["other"].includes(sectionName) && stripHtml(h2TextMatch[1]).toLowerCase().includes("recent")) break;
 
-    // Stop at Recent Changes section
-    if (sectionName === "other" && stripHtml(h2TextMatch[1]).toLowerCase().includes("recent")) break;
-
-    // Split by h3 to get individual bonuses
     const h3Parts = sectionPart.split(/<h3[^>]*>/i);
-
     for (const h3Part of h3Parts.slice(1)) {
-      // Extract h3 title
-      const titleMatch = h3Part.match(/^(.*?)<\/h3>/is);
+      const titleMatch = h3Part.match(/^([\s\S]*?)<\/h3>/i);
       if (!titleMatch) continue;
       const rawTitle = stripHtml(titleMatch[1]);
       if (!rawTitle || rawTitle.length < 3) continue;
+      if (rawTitle.toLowerCase().includes("expired")) continue;
 
-      const bankName = rawTitle.replace(/^\[[^\]]+\]\s*/, "").split(/\s*\$|\s*–|\s*-\s*[A-Z]/)[0].trim();
+      const bankName = rawTitle.replace(/^\[[^\]]+\]\s*/, "").split(/\s*\$|\s+–\s+[A-Z]|\s+-\s+[A-Z]/)[0].trim();
       const bonusAmount = extractAmount(rawTitle);
       const stateRestriction = extractStateRestriction(rawTitle);
       const isNationwide = !stateRestriction && sectionName !== "state" && sectionName !== "regional";
 
-      // Extract offer direct link (first <p> after h3)
-      const firstParaMatch = h3Part.match(/<p[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>(?:Direct link|Direct&nbsp;|Direct  link)[^<]*<\/a>/i);
-      const offerLink = firstParaMatch ? firstParaMatch[1] : null;
+      const offerLinkMatch = h3Part.match(/<p[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>\s*(?:Direct link|Direct&nbsp;\s*link|Direct\s+link)/i);
+      const offerLink = offerLinkMatch ? offerLinkMatch[1] : null;
 
-      // Extract description (second paragraph)
       const allParas = [...h3Part.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)];
       let description: string | null = null;
       for (const para of allParas) {
         const text = stripHtml(para[1]);
-        if (text && !text.toLowerCase().startsWith("direct link") && text.length > 10) {
+        if (text && !text.toLowerCase().startsWith("direct link") && !text.toLowerCase().startsWith("direct &nbsp") && text.length > 10) {
           description = text.slice(0, 500);
           break;
         }
       }
 
-      // Extract ul details
       const ulMatch = h3Part.match(/<ul[^>]*>([\s\S]*?)<\/ul>/i);
       const { pullType, ccFunding, directDepositInfo, docPostLink } = ulMatch
         ? parseUlDetails(ulMatch[0])
@@ -165,49 +173,35 @@ function parseDocPage(html: string): Array<{
         stateRestriction,
         nationwide: isNationwide,
         category: "bank",
+        pinned: false,
+        pubDate: new Date(),
+        fetchedAt: new Date(),
       });
     }
   }
-
   return results;
 }
 
-async function fetchAndCacheDocBonuses(): Promise<DocBonus[]> {
-  // Check cache freshness
-  const latest = await db
-    .select()
-    .from(docBonusesTable)
-    .orderBy(desc(docBonusesTable.fetchedAt))
-    .limit(1);
-
-  const now = Date.now();
-  if (latest.length > 0 && latest[0].fetchedAt) {
-    const age = now - new Date(latest[0].fetchedAt).getTime();
-    if (age < CACHE_TTL_MS) {
-      return db.select().from(docBonusesTable).orderBy(docBonusesTable.rank, desc(docBonusesTable.bonusAmount));
-    }
-  }
-
-  // Fetch and parse the DoC best bank bonuses page
+// ─── Core scrape function ─────────────────────────────────────────────────────
+async function scrapeDocPage(): Promise<void> {
+  console.log("[DoC] Starting scheduled scrape of", DOC_PAGE_URL);
   const res = await fetch(DOC_PAGE_URL, {
     headers: {
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       "Accept": "text/html",
     },
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(20000),
   });
-  if (!res.ok) throw new Error(`DoC page error: ${res.status}`);
+  if (!res.ok) throw new Error(`DoC page responded ${res.status}`);
   const html = await res.text();
-
   const bonuses = parseDocPage(html);
-  if (bonuses.length === 0) throw new Error("No bonuses parsed from DoC page");
+  if (bonuses.length === 0) throw new Error("Parsed 0 bonuses — page structure may have changed");
 
-  // Clear old page-sourced entries and re-insert fresh ones
   for (const bonus of bonuses) {
     try {
       await db
         .insert(docBonusesTable)
-        .values({ ...bonus, fetchedAt: new Date() })
+        .values(bonus)
         .onConflictDoUpdate({
           target: docBonusesTable.guid,
           set: {
@@ -227,32 +221,104 @@ async function fetchAndCacheDocBonuses(): Promise<DocBonus[]> {
           },
         });
     } catch (err) {
-      console.warn("Error upserting bonus:", bonus.guid, err);
+      console.warn("[DoC] Failed to upsert bonus:", bonus.guid, err);
     }
   }
-
-  return db.select().from(docBonusesTable).orderBy(docBonusesTable.rank, desc(docBonusesTable.bonusAmount));
+  console.log(`[DoC] Scrape complete — ${bonuses.length} bonuses upserted`);
 }
 
+// ─── Seed pinned offers on startup ───────────────────────────────────────────
+async function seedPinnedOffers(): Promise<void> {
+  for (const offer of PINNED_OFFERS) {
+    await db
+      .insert(docBonusesTable)
+      .values({ ...offer, fetchedAt: new Date() })
+      .onConflictDoUpdate({
+        target: docBonusesTable.guid,
+        set: {
+          title: offer.title,
+          description: offer.description,
+          bonusAmount: offer.bonusAmount,
+          offerLink: offer.offerLink,
+          docPostLink: offer.docPostLink,
+          pullType: offer.pullType,
+          ccFunding: offer.ccFunding,
+          directDepositInfo: offer.directDepositInfo,
+          section: offer.section,
+          rank: offer.rank,
+          nationwide: offer.nationwide,
+          pinned: true,
+          fetchedAt: new Date(),
+        },
+      });
+  }
+}
+
+// ─── Initial seed: scrape once if DB has no page data ────────────────────────
+async function initIfEmpty(): Promise<void> {
+  const [existing] = await db
+    .select()
+    .from(docBonusesTable)
+    .where(eq(docBonusesTable.source, "page"))
+    .limit(1);
+  if (!existing) {
+    console.log("[DoC] No page data in DB — running initial scrape");
+    await scrapeDocPage().catch(err => console.error("[DoC] Initial scrape failed:", err.message));
+  }
+}
+
+// ─── Schedule: Mon–Thu at 4 AM Eastern ───────────────────────────────────────
+// Cron: "0 4 * * 1-4" with timezone America/New_York covers both EST and EDT
+cron.schedule("0 4 * * 1-4", () => {
+  scrapeDocPage().catch(err => console.error("[DoC] Scheduled scrape failed:", err.message));
+}, { timezone: "America/New_York" });
+
+// Run init after a short delay to let the DB connection settle
+setTimeout(() => {
+  seedPinnedOffers().catch(err => console.error("[DoC] Seed pinned failed:", err.message));
+  initIfEmpty().catch(err => console.error("[DoC] Init check failed:", err.message));
+}, 2000);
+
+// ─── API routes ───────────────────────────────────────────────────────────────
 router.get("/bonuses/doc", async (req, res) => {
   try {
-    const section = req.query.section as string | undefined;
-    const nationwide = req.query.nationwide === "true";
+    const sectionFilter = req.query.section as string | undefined;
+    const nationwideOnly = req.query.nationwide === "true";
 
-    let bonuses = await fetchAndCacheDocBonuses();
+    let bonuses = await db
+      .select()
+      .from(docBonusesTable)
+      .orderBy(
+        desc(docBonusesTable.pinned),   // pinned entries first
+        asc(docBonusesTable.rank),       // then by rank
+        desc(docBonusesTable.bonusAmount)
+      );
 
-    if (section) bonuses = bonuses.filter(b => b.section === section);
-    if (req.query.nationwide === "true") bonuses = bonuses.filter(b => b.nationwide);
+    if (sectionFilter) bonuses = bonuses.filter(b => b.section === sectionFilter);
+    if (nationwideOnly) bonuses = bonuses.filter(b => b.nationwide);
 
-    res.json({ bonuses, count: bonuses.length, source: "doctorofcredit.com/best-bank-account-bonuses" });
+    const lastScrape = bonuses.find(b => b.source === "page")?.fetchedAt ?? null;
+
+    res.json({
+      bonuses,
+      count: bonuses.length,
+      source: "doctorofcredit.com/best-bank-account-bonuses",
+      lastScrape,
+      schedule: "Mon–Thu 4 AM ET",
+    });
   } catch (err: any) {
-    console.error("DoC page scrape error:", err.message);
-    try {
-      const cached = await db.select().from(docBonusesTable).orderBy(docBonusesTable.rank, desc(docBonusesTable.bonusAmount));
-      res.json({ bonuses: cached, count: cached.length, stale: true, source: "cache" });
-    } catch {
-      res.status(500).json({ error: "Failed to fetch bonuses" });
-    }
+    console.error("[DoC] API error:", err.message);
+    res.status(500).json({ error: "Failed to fetch bonuses" });
+  }
+});
+
+// Manually trigger a scrape (admin use)
+router.post("/bonuses/doc/refresh", async (_req, res) => {
+  try {
+    await scrapeDocPage();
+    res.json({ success: true, message: "Scrape completed" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

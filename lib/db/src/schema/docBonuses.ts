@@ -23,6 +23,7 @@ export const docBonusesTable = pgTable("doc_bonuses", {
   source: text("source").default("rss"),
   stateRestriction: text("state_restriction"),
   nationwide: boolean("nationwide").default(false),
+  pinned: boolean("pinned").default(false),
 });
 
 export const insertDocBonusSchema = createInsertSchema(docBonusesTable).omit({ id: true });

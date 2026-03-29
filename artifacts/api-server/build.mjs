@@ -31,6 +31,7 @@ async function buildAll() {
       "*.node",
       "openai",
       "plaid",
+      "node-cron",
       "p-limit",
       "p-retry",
       "sharp",
