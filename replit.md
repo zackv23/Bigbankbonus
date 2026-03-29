@@ -1,8 +1,8 @@
-# BigBankBonus — Mobile App
+# BigBankBonus — Mobile App + Marketing Website
 
 ## Overview
 
-Production-ready iOS/Android app for BigBankBonus.com built with Expo React Native. A full bank bonus discovery, tracking, and automation platform with AI agent, payment processing, and scheduling.
+Production-ready iOS/Android app for BigBankBonus.com built with Expo React Native + Node.js/Express API. A full bank bonus discovery, tracking, and automation platform with AI agent, payment processing, and scheduling. Includes a marketing website artifact at `/website/`.
 
 **Live at:** BigBankBonus.com — Find. Apply. Earn.
 
@@ -18,6 +18,8 @@ Production-ready iOS/Android app for BigBankBonus.com built with Expo React Nati
 - **Chrome Extension AutoFill Template** — Downloadable JSON for bank signup form autofill
 - **Apple/Google Auth + Biometrics + PIN** — Complete auth flow with expo-local-authentication
 - **Instagram Gradient Theme** — #833AB4 → #E1306C → #F77737 throughout
+- **Subscription Model** — Free / Pro Monthly $9.99 / Pro Annual $83.88; `/api/subscriptions/*` routes; `subscriptionsTable` DB schema; full in-app upgrade screen at `/subscription`
+- **Marketing Website** — Static React/Vite landing page at `/website/` with hero, stats, features, pricing toggle, testimonials, FAQ, framer-motion animations
 
 ## Stack
 

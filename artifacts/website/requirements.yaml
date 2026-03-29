@@ -1,0 +1,17 @@
+packages:
+  "framer-motion": "For premium scroll animations and smooth page transitions"
+  "clsx": "For conditional class names"
+  "tailwind-merge": "For merging tailwind classes safely"
+
+images:
+  - path: "artifacts/website/public/images/hero-mockup.png"
+    description: "A sleek, modern 3D mobile app UI mockup floating in a dark premium environment with moody lighting. The app screen shows a clean interface with a list of bank account bonuses, high cash amounts, and a modern financial dashboard. Subtle magenta, pink, and orange neon glow lighting around the edges."
+    aspect_ratio: "16:9"
+  - path: "artifacts/website/public/images/logo-icon.png"
+    description: "A minimalist, premium app icon logo featuring a sleek geometric 'B' or dollar sign, styled with a vibrant Instagram-like gradient (purple to pink to orange) on a transparent background."
+    aspect_ratio: "1:1"
+
+notes:
+  - This is a static marketing landing page.
+  - Using Framer Motion for scroll reveals to give a premium fintech feel.
+  - The pricing section uses local React state for the monthly/annual toggle.

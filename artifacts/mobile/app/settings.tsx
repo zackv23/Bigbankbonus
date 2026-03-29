@@ -123,6 +123,23 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 40) }}>
+
+        {/* Pro upgrade banner */}
+        <Pressable onPress={() => router.push("/subscription")} style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 4, borderRadius: 16, overflow: "hidden" }}>
+          <LinearGradient colors={["#833AB4", "#E1306C", "#F77737"]} style={{ flexDirection: "row", alignItems: "center", padding: 16, gap: 12 }} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#fff" }}>Upgrade to Pro</Text>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.85)", marginTop: 2 }}>
+                All 200+ live deals · AI agent · Autopay scheduler
+              </Text>
+            </View>
+            <View style={{ backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#fff" }}>$6.99/mo</Text>
+            </View>
+            <Feather name="arrow-right" size={16} color="#fff" />
+          </LinearGradient>
+        </Pressable>
+
         <View style={sStyles.section}>
           <Text style={[sStyles.sectionLabel, { color: c.textSecondary }]}>SECURITY</Text>
           <View style={[sStyles.sectionCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}>

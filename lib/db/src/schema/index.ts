@@ -21,3 +21,4 @@ export * from "./banks";
 export * from "./docBonuses";
 export * from "./plaidItems";
 export * from "./autopaySchedules";
+export * from "./subscriptions";
