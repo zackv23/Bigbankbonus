@@ -207,6 +207,7 @@ function DoCBonusCard({ bonus, isDark }: { bonus: DoCBonus; isDark: boolean }) {
 
 type FilterType = "all" | "no-ews" | "no-minimum" | "no-biometrics";
 type SortType = "bonus" | "percentage" | "time" | "rating";
+type DocSortType = "rank" | "bonus" | "soft" | "nodd" | "apy";
 
 const FILTER_CHIPS: { key: FilterType; label: string; icon: string }[] = [
   { key: "all", label: "All Banks", icon: "grid" },
@@ -220,6 +221,14 @@ const SORT_OPTIONS: { key: SortType; label: string }[] = [
   { key: "percentage", label: "Bonus %" },
   { key: "time", label: "Fastest" },
   { key: "rating", label: "Top Rated" },
+];
+
+const DOC_SORT_OPTIONS: { key: DocSortType; label: string; icon: string }[] = [
+  { key: "rank",  label: "DoC Rank",   icon: "award" },
+  { key: "bonus", label: "Bonus $",    icon: "dollar-sign" },
+  { key: "apy",   label: "APY %",      icon: "trending-up" },
+  { key: "soft",  label: "Soft Pull",  icon: "shield" },
+  { key: "nodd",  label: "No DD",      icon: "check-circle" },
 ];
 
 function BankCard({ bank }: { bank: Bank }) {
@@ -312,6 +321,7 @@ export default function DiscoverScreen() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [sort, setSort] = useState<SortType>("bonus");
   const [minBonus, setMinBonus] = useState("");
+  const [docSort, setDocSort] = useState<DocSortType>("rank");
   const { bonuses: docBonuses, loading: docLoading } = useDoCBonuses();
 
   const banks = useMemo(() => {
@@ -328,6 +338,37 @@ export default function DiscoverScreen() {
     if (sort === "time") return sortByTimeToBonus(result);
     return [...result].sort((a, b) => b.rating - a.rating);
   }, [filter, sort, search, minBonus]);
+
+  const sortedDocBonuses = useMemo(() => {
+    const list = [...docBonuses];
+    switch (docSort) {
+      case "bonus":
+        return list.sort((a, b) => (b.bonusAmount ?? 0) - (a.bonusAmount ?? 0));
+      case "apy":
+        // Sort by 1×/mo APY descending (bonus/ddAmount ratio × 365/15)
+        return list.sort((a, b) => {
+          const apyA = a.bonusAmount ? (a.bonusAmount / Math.ceil(a.bonusAmount / 3)) : 0;
+          const apyB = b.bonusAmount ? (b.bonusAmount / Math.ceil(b.bonusAmount / 3)) : 0;
+          return apyB - apyA;
+        });
+      case "soft":
+        // Soft pull first, then hard, then unknown
+        return list.sort((a, b) => {
+          const order = (p?: string | null) => p === "soft" ? 0 : p === "hard" ? 1 : 2;
+          return order(a.pullType) - order(b.pullType);
+        });
+      case "nodd":
+        // No DD required first
+        return list.sort((a, b) => {
+          const noDD = (d?: string | null) =>
+            d && !d.toLowerCase().includes("not required") ? 1 : 0;
+          return noDD(a.directDepositInfo) - noDD(b.directDepositInfo);
+        });
+      case "rank":
+      default:
+        return list.sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999));
+    }
+  }, [docBonuses, docSort]);
 
   const noEWSCount = BANKS.filter(b => !b.ewsReporting).length;
 
@@ -435,8 +476,33 @@ export default function DiscoverScreen() {
                 <Feather name="zap" size={14} color="#E1306C" />
                 <Text style={[styles.docSectionTitle, { color: c.text }]}>Live Deals — Doctor of Credit</Text>
               </View>
-              <Text style={[styles.docSectionSub, { color: c.textSecondary }]}>Updated hourly · Tap to open</Text>
+              <Text style={[styles.docSectionSub, { color: c.textSecondary }]}>
+                {docLoading ? "Loading…" : `${sortedDocBonuses.length} offers`} · Tap to open
+              </Text>
             </View>
+
+            {/* DoC sort chips */}
+            {!docLoading && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.docSortScroll}>
+                {DOC_SORT_OPTIONS.map(opt => {
+                  const active = docSort === opt.key;
+                  return (
+                    <Pressable
+                      key={opt.key}
+                      style={[styles.docSortChip, active && styles.docSortChipActive]}
+                      onPress={() => {
+                        if (Platform.OS !== "web") Haptics.selectionAsync();
+                        setDocSort(opt.key);
+                      }}
+                    >
+                      <Feather name={opt.icon as any} size={10} color={active ? "#fff" : "#833AB4"} />
+                      <Text style={[styles.docSortChipText, { color: active ? "#fff" : "#833AB4" }]}>{opt.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+
             {docLoading ? (
               <View style={styles.docLoading}>
                 <ActivityIndicator color="#833AB4" size="small" />
@@ -444,7 +510,7 @@ export default function DiscoverScreen() {
               </View>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.docScroll}>
-                {docBonuses.map(b => (
+                {sortedDocBonuses.map(b => (
                   <DoCBonusCard key={b.id} bonus={b} isDark={isDark} />
                 ))}
               </ScrollView>
@@ -528,6 +594,12 @@ const styles = StyleSheet.create({
   docAge: { fontSize: 10, fontFamily: "Inter_400Regular" },
   docDivider: { height: 1, marginHorizontal: 16, marginTop: 4, marginBottom: 12 },
   allBanksLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", paddingHorizontal: 16, paddingBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 },
+
+  // DoC sort chips
+  docSortScroll: { paddingHorizontal: 16, paddingBottom: 6, gap: 6, flexDirection: "row" },
+  docSortChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: "#833AB4", backgroundColor: "transparent" },
+  docSortChipActive: { backgroundColor: "#833AB4", borderColor: "#833AB4" },
+  docSortChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 
   // Autopay button
   autopayBtn: { borderRadius: 8, overflow: "hidden" },
