@@ -17,11 +17,13 @@
     "cors": "^2",
     "drizzle-orm": "catalog:",
     "express": "^5",
+    "fast-xml-parser": "^5.5.9",
     "openai": "^6.33.0",
     "p-limit": "^7.3.0",
     "p-retry": "^7.1.1",
     "pino": "^9",
-    "pino-http": "^10"
+    "pino-http": "^10",
+    "plaid": "^41.4.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

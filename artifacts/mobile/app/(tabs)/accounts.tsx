@@ -2,10 +2,12 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -21,6 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { ManagedAccount, useAccounts } from "@/context/AccountsContext";
 import { useCredits } from "@/context/CreditsContext";
+import { PlaidAccount, PlaidItem, PlaidTransaction, usePlaid } from "@/context/PlaidContext";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#FFB300",
@@ -230,6 +233,116 @@ function EditAccountModal({ account, visible, onClose }: { account: ManagedAccou
   );
 }
 
+function PlaidItemCard({ item, isDark }: { item: PlaidItem; isDark: boolean }) {
+  const c = isDark ? Colors.dark : Colors.light;
+  const { unlinkBank, refreshBalance, fetchTransactions } = usePlaid();
+  const [accounts, setAccounts] = useState<PlaidAccount[]>((item.accounts as PlaidAccount[]) ?? []);
+  const [txs, setTxs] = useState<PlaidTransaction[]>([]);
+  const [showTxs, setShowTxs] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const totalBalance = accounts.reduce((s, a) => s + (a.balances.available ?? 0), 0);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const updated = await refreshBalance(item.itemId);
+    if (updated.length) setAccounts(updated);
+    setRefreshing(false);
+  };
+
+  const handleShowTxs = async () => {
+    if (!showTxs && txs.length === 0) {
+      const data = await fetchTransactions(item.itemId);
+      setTxs(data);
+    }
+    setShowTxs(v => !v);
+  };
+
+  const handleUnlink = () => {
+    Alert.alert("Unlink Bank", `Remove ${item.institutionName ?? "bank"} from Plaid?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Unlink", style: "destructive", onPress: () => unlinkBank(item.itemId) },
+    ]);
+  };
+
+  const directDeposits = txs.filter(t =>
+    t.category?.some(c => c.toLowerCase().includes("direct deposit") || c.toLowerCase().includes("payroll")) && t.amount < 0
+  );
+  const bonusTxs = txs.filter(t => (t.name.toLowerCase().includes("bonus") || t.name.toLowerCase().includes("reward")) && t.amount < 0);
+
+  return (
+    <View style={[styles.plaidCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
+      <View style={styles.plaidCardTop}>
+        <LinearGradient colors={["#833AB4", "#E1306C"]} style={styles.plaidBankIcon}>
+          <Text style={styles.plaidBankIconText}>{(item.institutionName ?? "B").charAt(0)}</Text>
+        </LinearGradient>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.plaidBankName, { color: c.text }]}>{item.institutionName ?? "Bank"}</Text>
+          <Text style={[styles.plaidBankSub, { color: c.textSecondary }]}>{accounts.length} account{accounts.length !== 1 ? "s" : ""} linked via Plaid</Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={[styles.plaidBalance, { color: c.text }]}>${totalBalance.toLocaleString()}</Text>
+          <Text style={[styles.plaidBalanceSub, { color: c.textSecondary }]}>total balance</Text>
+        </View>
+      </View>
+
+      <View style={styles.plaidAccounts}>
+        {accounts.map(a => (
+          <View key={a.account_id} style={[styles.plaidAccountRow, { borderColor: c.cardBorder }]}>
+            <View style={[styles.plaidAccountDot, { backgroundColor: a.subtype === "checking" ? "#2196F3" : "#4CAF50" }]} />
+            <Text style={[styles.plaidAccountName, { color: c.text }]}>{a.name}</Text>
+            <Text style={[styles.plaidAccountMask, { color: c.textSecondary }]}>••{a.mask}</Text>
+            <Text style={[styles.plaidAccountBal, { color: c.text }]}>${(a.balances.available ?? 0).toLocaleString()}</Text>
+          </View>
+        ))}
+      </View>
+
+      {showTxs && txs.length > 0 && (
+        <View style={[styles.txSection, { borderColor: c.cardBorder }]}>
+          <View style={styles.txStats}>
+            <View style={[styles.txStatBox, { backgroundColor: "#4CAF5022" }]}>
+              <Feather name="arrow-down-circle" size={14} color="#4CAF50" />
+              <Text style={[styles.txStatVal, { color: "#4CAF50" }]}>{directDeposits.length}</Text>
+              <Text style={[styles.txStatLabel, { color: c.textSecondary }]}>Direct Deposits</Text>
+            </View>
+            <View style={[styles.txStatBox, { backgroundColor: "#F7773722" }]}>
+              <Feather name="gift" size={14} color="#F77737" />
+              <Text style={[styles.txStatVal, { color: "#F77737" }]}>{bonusTxs.length}</Text>
+              <Text style={[styles.txStatLabel, { color: c.textSecondary }]}>Bonuses Detected</Text>
+            </View>
+          </View>
+          {txs.slice(0, 5).map(tx => (
+            <View key={tx.transaction_id} style={[styles.txRow, { borderColor: c.cardBorder }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.txName, { color: c.text }]} numberOfLines={1}>{tx.name}</Text>
+                <Text style={[styles.txDate, { color: c.textSecondary }]}>{tx.date}</Text>
+              </View>
+              <Text style={[styles.txAmount, { color: tx.amount < 0 ? "#4CAF50" : "#F44336" }]}>
+                {tx.amount < 0 ? "+" : "-"}${Math.abs(tx.amount).toFixed(2)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.plaidCardActions}>
+        <Pressable style={[styles.plaidAction, { backgroundColor: c.backgroundSecondary }]} onPress={handleRefresh} disabled={refreshing}>
+          {refreshing ? <ActivityIndicator size={13} color="#833AB4" /> : <Feather name="refresh-cw" size={13} color="#833AB4" />}
+          <Text style={[styles.plaidActionText, { color: "#833AB4" }]}>Refresh</Text>
+        </Pressable>
+        <Pressable style={[styles.plaidAction, { backgroundColor: c.backgroundSecondary }]} onPress={handleShowTxs}>
+          <Feather name="list" size={13} color={c.textSecondary} />
+          <Text style={[styles.plaidActionText, { color: c.textSecondary }]}>{showTxs ? "Hide" : "Transactions"}</Text>
+        </Pressable>
+        <Pressable style={[styles.plaidAction, { backgroundColor: "#F4433611" }]} onPress={handleUnlink}>
+          <Feather name="link-2" size={13} color="#F44336" />
+          <Text style={[styles.plaidActionText, { color: "#F44336" }]}>Unlink</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export default function AccountsScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
@@ -237,10 +350,13 @@ export default function AccountsScreen() {
   const c = isDark ? Colors.dark : Colors.light;
   const { accounts, totalBonusEarned, totalBonusPending, totalDeposited } = useAccounts();
   const { availableCredits, totalCredits } = useCredits();
+  const { items: plaidItems, isLoading: plaidLoading, linkBank, totalLinkedBalance, directDepositsDetected, bonusesDetected } = usePlaid();
   const [editingAccount, setEditingAccount] = useState<ManagedAccount | null>(null);
 
-  return (
-    <View style={[styles.container, { backgroundColor: c.background }]}>
+  const activeItems = plaidItems.filter(i => i.status === "active");
+
+  const listHeader = (
+    <>
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 12) }]}>
         <LinearGradient colors={["#E1306C", "#F77737"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
         <View style={styles.headerRow}>
@@ -282,11 +398,74 @@ export default function AccountsScreen() {
         </View>
       </View>
 
-      {accounts.length === 0 ? (
+      {/* Plaid Section */}
+      <View style={[styles.plaidSection, { backgroundColor: c.background }]}>
+        <View style={styles.plaidHeader}>
+          <View style={styles.plaidTitleRow}>
+            <Feather name="link" size={16} color="#833AB4" />
+            <Text style={[styles.plaidTitle, { color: c.text }]}>Plaid Connected Banks</Text>
+          </View>
+          <View style={styles.plaidHeaderStats}>
+            {activeItems.length > 0 && (
+              <>
+                <View style={styles.plaidStat}>
+                  <Text style={[styles.plaidStatVal, { color: "#4CAF50" }]}>${totalLinkedBalance.toLocaleString()}</Text>
+                  <Text style={[styles.plaidStatLabel, { color: c.textSecondary }]}>Linked Balance</Text>
+                </View>
+                <View style={styles.plaidStat}>
+                  <Text style={[styles.plaidStatVal, { color: "#2196F3" }]}>{directDepositsDetected}</Text>
+                  <Text style={[styles.plaidStatLabel, { color: c.textSecondary }]}>Deposits Tracked</Text>
+                </View>
+                <View style={styles.plaidStat}>
+                  <Text style={[styles.plaidStatVal, { color: "#F77737" }]}>{bonusesDetected}</Text>
+                  <Text style={[styles.plaidStatLabel, { color: c.textSecondary }]}>Bonuses Found</Text>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+
+        {activeItems.map(item => (
+          <PlaidItemCard key={item.itemId} item={item} isDark={isDark} />
+        ))}
+
+        <Pressable
+          style={styles.linkPlaidBtn}
+          onPress={linkBank}
+          disabled={plaidLoading}
+        >
+          <LinearGradient colors={["#833AB4", "#E1306C", "#F77737"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.linkPlaidBtnGrad}>
+            {plaidLoading ? (
+              <ActivityIndicator color="#fff" size={16} />
+            ) : (
+              <Feather name="link" size={16} color="#fff" />
+            )}
+            <Text style={styles.linkPlaidText}>
+              {plaidLoading ? "Linking..." : `+ Link Bank Account with Plaid${activeItems.length > 0 ? " (Add Another)" : ""}`}
+            </Text>
+          </LinearGradient>
+        </Pressable>
+        <Text style={[styles.plaidDisclaimer, { color: c.textTertiary }]}>
+          Plaid securely connects to 12,000+ US banks. Your credentials are never shared.
+        </Text>
+      </View>
+
+      {accounts.length > 0 && (
+        <View style={[styles.sectionHeader, { borderColor: c.cardBorder }]}>
+          <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Tracked Bonuses</Text>
+        </View>
+      )}
+    </>
+  );
+
+  if (accounts.length === 0 && activeItems.length === 0) {
+    return (
+      <View style={[styles.container, { backgroundColor: c.background }]}>
+        {listHeader}
         <View style={styles.emptyState}>
           <Feather name="credit-card" size={48} color={c.textTertiary} />
-          <Text style={[styles.emptyTitle, { color: c.textSecondary }]}>No accounts yet</Text>
-          <Text style={[styles.emptySubtitle, { color: c.textTertiary }]}>Find banks in Discover and add them to start tracking</Text>
+          <Text style={[styles.emptyTitle, { color: c.textSecondary }]}>No tracked bonuses</Text>
+          <Text style={[styles.emptySubtitle, { color: c.textTertiary }]}>Find banks in Discover and add them to start tracking bonuses</Text>
           <Pressable style={styles.emptyBtn} onPress={() => router.push("/(tabs)/")}>
             <LinearGradient colors={["#833AB4", "#E1306C"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.emptyBtnGrad}>
               <Feather name="search" size={16} color="#fff" />
@@ -294,16 +473,25 @@ export default function AccountsScreen() {
             </LinearGradient>
           </Pressable>
         </View>
-      ) : (
-        <FlatList
-          data={accounts}
-          keyExtractor={a => a.id}
-          renderItem={({ item }) => <AccountCard account={item} onEdit={setEditingAccount} />}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 80) }]}
-          showsVerticalScrollIndicator={false}
+        <EditAccountModal
+          account={editingAccount}
+          visible={!!editingAccount}
+          onClose={() => setEditingAccount(null)}
         />
-      )}
+      </View>
+    );
+  }
 
+  return (
+    <View style={[styles.container, { backgroundColor: c.background }]}>
+      <FlatList
+        data={accounts}
+        keyExtractor={a => a.id}
+        ListHeaderComponent={listHeader}
+        renderItem={({ item }) => <AccountCard account={item} onEdit={setEditingAccount} />}
+        contentContainerStyle={{ paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 80) }}
+        showsVerticalScrollIndicator={false}
+      />
       <EditAccountModal
         account={editingAccount}
         visible={!!editingAccount}
@@ -358,6 +546,46 @@ const styles = StyleSheet.create({
   progressBar: { height: 6, borderRadius: 3, overflow: "hidden" },
   progressFill: { height: 6, borderRadius: 3 },
   bonusRow: { flexDirection: "row", marginTop: 4 },
+  sectionHeader: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
+  sectionTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
+  plaidSection: { padding: 16, gap: 12 },
+  plaidHeader: { gap: 8 },
+  plaidTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  plaidTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  plaidHeaderStats: { flexDirection: "row", gap: 12 },
+  plaidStat: { flex: 1, alignItems: "center" },
+  plaidStatVal: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  plaidStatLabel: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 2 },
+  plaidCard: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 12 },
+  plaidCardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+  plaidBankIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  plaidBankIconText: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#fff" },
+  plaidBankName: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  plaidBankSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  plaidBalance: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  plaidBalanceSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+  plaidAccounts: { gap: 6 },
+  plaidAccountRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, borderTopWidth: 1 },
+  plaidAccountDot: { width: 8, height: 8, borderRadius: 4 },
+  plaidAccountName: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular" },
+  plaidAccountMask: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  plaidAccountBal: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  txSection: { borderTopWidth: 1, paddingTop: 10, gap: 8 },
+  txStats: { flexDirection: "row", gap: 8, marginBottom: 4 },
+  txStatBox: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, padding: 8, borderRadius: 10 },
+  txStatVal: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  txStatLabel: { fontSize: 10, fontFamily: "Inter_400Regular", flex: 1 },
+  txRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, borderTopWidth: 1 },
+  txName: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  txDate: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  txAmount: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  plaidCardActions: { flexDirection: "row", gap: 8 },
+  plaidAction: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 8, borderRadius: 10 },
+  plaidActionText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  linkPlaidBtn: { overflow: "hidden", borderRadius: 14 },
+  linkPlaidBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14, paddingHorizontal: 20 },
+  linkPlaidText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  plaidDisclaimer: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 16 },
   bonusTarget: { fontSize: 12, fontFamily: "Inter_400Regular" },
   bonusTargetAmount: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   cardActions: { flexDirection: "row", gap: 8 },

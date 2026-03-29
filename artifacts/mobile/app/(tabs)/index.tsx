@@ -2,9 +2,11 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -19,6 +21,82 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { BANKS, Bank, getEWSFreebanks, getNoMinimumBanks, sortByBonusAmount, sortByBonusPercentage, sortByTimeToBonus } from "@/constants/banks";
 import { useAccounts } from "@/context/AccountsContext";
+
+interface DoCBonus {
+  id: number;
+  title: string;
+  link: string;
+  description?: string;
+  bankName?: string;
+  bonusAmount?: number;
+  pubDate?: string;
+}
+
+function useDoCBonuses() {
+  const [bonuses, setBonuses] = useState<DoCBonus[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const domain = process.env.EXPO_PUBLIC_DOMAIN;
+    const url = domain ? `https://${domain}/api/bonuses/doc` : "http://localhost:8080/api/bonuses/doc";
+    setLoading(true);
+    fetch(url, { signal: AbortSignal.timeout(12000) })
+      .then(r => r.json())
+      .then(data => setBonuses(data.bonuses ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { bonuses, loading };
+}
+
+function DoCBonusCard({ bonus, isDark }: { bonus: DoCBonus; isDark: boolean }) {
+  const c = isDark ? Colors.dark : Colors.light;
+  const amount = bonus.bonusAmount;
+  const daysAgo = bonus.pubDate
+    ? Math.max(0, Math.floor((Date.now() - new Date(bonus.pubDate).getTime()) / 86400000))
+    : null;
+
+  return (
+    <Pressable
+      style={[styles.docCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}
+      onPress={() => Linking.openURL(bonus.link).catch(() => {})}
+    >
+      <LinearGradient colors={["#833AB422", "#E1306C22"]} style={styles.docCardAccent} />
+      <View style={styles.docCardTop}>
+        {amount ? (
+          <View style={styles.docBonusBadge}>
+            <Text style={styles.docBonusAmount}>${amount}</Text>
+          </View>
+        ) : (
+          <View style={[styles.docBonusBadge, { backgroundColor: "#F7773722" }]}>
+            <Feather name="gift" size={12} color="#F77737" />
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.docCardTitle, { color: c.text }]} numberOfLines={2}>{bonus.title}</Text>
+          {bonus.bankName && (
+            <Text style={[styles.docCardBank, { color: "#833AB4" }]}>{bonus.bankName}</Text>
+          )}
+        </View>
+        <Feather name="external-link" size={14} color={c.textTertiary} />
+      </View>
+      {bonus.description && (
+        <Text style={[styles.docCardDesc, { color: c.textSecondary }]} numberOfLines={2}>{bonus.description}</Text>
+      )}
+      <View style={styles.docCardFooter}>
+        <View style={[styles.docSourceBadge, { backgroundColor: "#4CAF5022" }]}>
+          <Text style={[styles.docSourceText, { color: "#4CAF50" }]}>DoctorOfCredit</Text>
+        </View>
+        {daysAgo !== null && (
+          <Text style={[styles.docAge, { color: c.textTertiary }]}>
+            {daysAgo === 0 ? "Today" : daysAgo === 1 ? "Yesterday" : `${daysAgo}d ago`}
+          </Text>
+        )}
+      </View>
+    </Pressable>
+  );
+}
 
 type FilterType = "all" | "no-ews" | "no-minimum" | "no-biometrics";
 type SortType = "bonus" | "percentage" | "time" | "rating";
@@ -127,6 +205,7 @@ export default function DiscoverScreen() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [sort, setSort] = useState<SortType>("bonus");
   const [minBonus, setMinBonus] = useState("");
+  const { bonuses: docBonuses, loading: docLoading } = useDoCBonuses();
 
   const banks = useMemo(() => {
     let result = [...BANKS];
@@ -242,9 +321,33 @@ export default function DiscoverScreen() {
         data={banks}
         keyExtractor={b => b.id}
         renderItem={({ item }) => <BankCard bank={item} />}
+        ListHeaderComponent={docBonuses.length > 0 || docLoading ? (
+          <View style={[styles.docSection, { backgroundColor: c.background }]}>
+            <View style={styles.docSectionHeader}>
+              <View style={styles.docSectionTitleRow}>
+                <Feather name="zap" size={14} color="#E1306C" />
+                <Text style={[styles.docSectionTitle, { color: c.text }]}>Live Deals — Doctor of Credit</Text>
+              </View>
+              <Text style={[styles.docSectionSub, { color: c.textSecondary }]}>Updated hourly · Tap to open</Text>
+            </View>
+            {docLoading ? (
+              <View style={styles.docLoading}>
+                <ActivityIndicator color="#833AB4" size="small" />
+                <Text style={[styles.docLoadingText, { color: c.textSecondary }]}>Fetching live bonuses...</Text>
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.docScroll}>
+                {docBonuses.map(b => (
+                  <DoCBonusCard key={b.id} bonus={b} isDark={isDark} />
+                ))}
+              </ScrollView>
+            )}
+            <View style={[styles.docDivider, { backgroundColor: c.separator }]} />
+            <Text style={[styles.allBanksLabel, { color: c.textSecondary }]}>All Banks in Database</Text>
+          </View>
+        ) : null}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 80) }]}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!!banks.length}
       />
     </View>
   );
@@ -292,4 +395,26 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   statLabel: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 2 },
   statDivider: { width: 1, marginVertical: 2 },
+  docSection: { paddingTop: 4 },
+  docSectionHeader: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  docSectionTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+  docSectionTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  docSectionSub: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  docLoading: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 16 },
+  docLoadingText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  docScroll: { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
+  docCard: { width: 240, borderRadius: 14, borderWidth: 1, padding: 12, overflow: "hidden" },
+  docCardAccent: { position: "absolute", top: 0, left: 0, right: 0, height: 3 },
+  docCardTop: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 8 },
+  docBonusBadge: { backgroundColor: "#833AB422", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, alignItems: "center", justifyContent: "center" },
+  docBonusAmount: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#833AB4" },
+  docCardTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", lineHeight: 18, flex: 1 },
+  docCardBank: { fontSize: 11, fontFamily: "Inter_600SemiBold", marginTop: 2 },
+  docCardDesc: { fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 16, marginBottom: 8 },
+  docCardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  docSourceBadge: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
+  docSourceText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  docAge: { fontSize: 10, fontFamily: "Inter_400Regular" },
+  docDivider: { height: 1, marginHorizontal: 16, marginTop: 4, marginBottom: 12 },
+  allBanksLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", paddingHorizontal: 16, paddingBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 },
 });

@@ -18,6 +18,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AccountsProvider } from "@/context/AccountsContext";
 import { SchedulerProvider } from "@/context/SchedulerContext";
 import { CreditsProvider } from "@/context/CreditsContext";
+import { PlaidProvider } from "@/context/PlaidContext";
 
 if (process.env.EXPO_PUBLIC_DOMAIN) {
   setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
@@ -70,7 +71,9 @@ export default function RootLayout() {
                 <AccountsProvider>
                   <SchedulerProvider>
                     <CreditsProvider>
-                      <RootLayoutNav />
+                      <PlaidProvider>
+                        <RootLayoutNav />
+                      </PlaidProvider>
                     </CreditsProvider>
                   </SchedulerProvider>
                 </AccountsProvider>

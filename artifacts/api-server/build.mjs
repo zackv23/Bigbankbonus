@@ -30,6 +30,7 @@ async function buildAll() {
     external: [
       "*.node",
       "openai",
+      "plaid",
       "p-limit",
       "p-retry",
       "sharp",
