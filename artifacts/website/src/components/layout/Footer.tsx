@@ -37,9 +37,9 @@ export function Footer() {
           <div>
             <h4 className="text-white font-bold mb-4">Legal</h4>
             <ul className="space-y-3">
-              <li><Link href="/" className="text-slate-400 hover:text-brand-pink transition-colors">Privacy Policy</Link></li>
-              <li><Link href="/" className="text-slate-400 hover:text-brand-pink transition-colors">Terms of Service</Link></li>
-              <li><Link href="/" className="text-slate-400 hover:text-brand-pink transition-colors">Contact Support</Link></li>
+              <li><Link href="/privacy" className="text-slate-400 hover:text-brand-pink transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="text-slate-400 hover:text-brand-pink transition-colors">Terms of Service</Link></li>
+              <li><a href="mailto:support@bigbankbonus.com" className="text-slate-400 hover:text-brand-pink transition-colors">Contact Support</a></li>
             </ul>
           </div>
         </div>

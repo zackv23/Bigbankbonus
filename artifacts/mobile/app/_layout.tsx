@@ -5,7 +5,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack, router } from "expo-router";
+import { Stack, router, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -28,26 +28,34 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+// Screens that don't require authentication
+const PUBLIC_SCREENS = ["auth", "legal"];
+
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuth();
+  const segments = useSegments();
 
   useEffect(() => {
     if (!isLoading) {
       SplashScreen.hideAsync();
-      if (!isAuthenticated) {
+      const currentScreen = segments[0] as string | undefined;
+      const isPublicScreen = !currentScreen || PUBLIC_SCREENS.includes(currentScreen);
+      if (!isAuthenticated && !isPublicScreen) {
         router.replace("/auth");
       }
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, segments]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="auth" options={{ headerShown: false, presentation: "fullScreenModal" }} />
+      <Stack.Screen name="legal" options={{ headerShown: false, presentation: "modal" }} />
       <Stack.Screen name="pin" options={{ headerShown: false, presentation: "fullScreenModal" }} />
       <Stack.Screen name="bank/[id]" options={{ headerShown: false, presentation: "card" }} />
       <Stack.Screen name="payment" options={{ headerShown: false, presentation: "modal" }} />
       <Stack.Screen name="settings" options={{ headerShown: false, presentation: "modal" }} />
+      <Stack.Screen name="subscription" options={{ headerShown: false, presentation: "modal" }} />
     </Stack>
   );
 }

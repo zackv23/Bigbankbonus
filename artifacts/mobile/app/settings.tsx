@@ -181,6 +181,15 @@ export default function SettingsScreen() {
         </View>
 
         <View style={sStyles.section}>
+          <Text style={[sStyles.sectionLabel, { color: c.textSecondary }]}>LEGAL</Text>
+          <View style={[sStyles.sectionCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
+            <SettingsRow icon="shield" label="Privacy Policy" sublabel="How we handle your data" tint="#833AB4" onPress={() => router.push("/legal")} />
+            <SettingsRow icon="file-text" label="Terms of Service" sublabel="Usage rules, fees, and disclaimers" tint="#E1306C" onPress={() => router.push("/legal")} />
+            <SettingsRow icon="mail" label="Contact Support" sublabel="support@bigbankbonus.com" tint="#F77737" onPress={() => { const { Linking } = require("react-native"); Linking.openURL("mailto:support@bigbankbonus.com"); }} />
+          </View>
+        </View>
+
+        <View style={sStyles.section}>
           <Text style={[sStyles.sectionLabel, { color: c.textSecondary }]}>INTEGRATIONS</Text>
           <View style={[sStyles.sectionCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
             <SettingsRow

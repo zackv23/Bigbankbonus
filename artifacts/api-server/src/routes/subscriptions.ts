@@ -29,6 +29,15 @@ async function stripeGet(path: string): Promise<Record<string, any>> {
   return res.json() as Promise<Record<string, any>>;
 }
 
+// ─── GET /subscriptions/prices — public pricing (MUST be before /:userId) ───────
+router.get("/subscriptions/prices", (_req, res) => {
+  res.json({
+    monthly: { price: 9.99, interval: "month", label: "Pro Monthly", priceId: PRICE_IDS.monthly },
+    annual:  { price: 83.88, interval: "year", monthlyEquivalent: 6.99, label: "Pro Annual",
+               discount: 30, priceId: PRICE_IDS.annual },
+  });
+});
+
 // ─── GET /subscriptions/:userId ───────────────────────────────────────────────
 router.get("/subscriptions/:userId", async (req, res) => {
   const { userId } = req.params;
@@ -149,15 +158,6 @@ router.post("/subscriptions/cancel", async (req, res) => {
     .returning();
 
   res.json({ subscription: updated });
-});
-
-// ─── GET /subscriptions/prices — public pricing ───────────────────────────────
-router.get("/subscriptions/prices", (_req, res) => {
-  res.json({
-    monthly: { price: 9.99, interval: "month", label: "Pro Monthly", priceId: PRICE_IDS.monthly },
-    annual:  { price: 83.88, interval: "year", monthlyEquivalent: 6.99, label: "Pro Annual",
-               discount: 30, priceId: PRICE_IDS.annual },
-  });
 });
 
 // ─── Feature gates ────────────────────────────────────────────────────────────

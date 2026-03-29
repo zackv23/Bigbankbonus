@@ -255,9 +255,14 @@ export default function AuthScreen() {
             </Pressable>
           </View>
 
-          <Text style={styles.legal}>
-            By continuing, you agree to our Terms of Service and Privacy Policy
-          </Text>
+          <Pressable onPress={() => router.push("/legal")} style={{ alignSelf: "center" }}>
+            <Text style={styles.legal}>
+              By continuing, you agree to our{" "}
+              <Text style={{ color: "rgba(255,255,255,0.65)", textDecorationLine: "underline" }}>Terms of Service</Text>
+              {" "}and{" "}
+              <Text style={{ color: "rgba(255,255,255,0.65)", textDecorationLine: "underline" }}>Privacy Policy</Text>
+            </Text>
+          </Pressable>
         </Reanimated.View>
       </View>
     </View>
