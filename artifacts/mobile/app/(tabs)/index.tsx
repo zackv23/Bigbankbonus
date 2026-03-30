@@ -22,6 +22,7 @@ import Colors from "@/constants/colors";
 import { BANKS, Bank, getEWSFreebanks, getNoMinimumBanks, sortByBonusAmount, sortByBonusPercentage, sortByTimeToBonus } from "@/constants/banks";
 import { useAccounts } from "@/context/AccountsContext";
 import AutopayModal, { calcAutopay } from "@/components/AutopayModal";
+import ROICCalculator from "@/components/ROICCalculator";
 
 interface DoCBonus {
   id: number;
@@ -325,6 +326,7 @@ export default function DiscoverScreen() {
   const [sort, setSort] = useState<SortType>("bonus");
   const [minBonus, setMinBonus] = useState("");
   const [docSort, setDocSort] = useState<DocSortType>("rank");
+  const [calcVisible, setCalcVisible] = useState(false);
   const { bonuses: docBonuses, loading: docLoading } = useDoCBonuses();
 
   const banks = useMemo(() => {
@@ -377,6 +379,7 @@ export default function DiscoverScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
+      <ROICCalculator visible={calcVisible} onClose={() => setCalcVisible(false)} />
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 12) }]}>
         <LinearGradient
           colors={["#833AB4", "#E1306C", "#F77737"]}
@@ -389,12 +392,20 @@ export default function DiscoverScreen() {
             <Text style={styles.headerTitle}>Discover</Text>
             <Text style={styles.headerSub}>{BANKS.length} banks · {noEWSCount} No-EWS</Text>
           </View>
-          <Pressable
-            style={styles.settingsBtn}
-            onPress={() => router.push("/settings")}
-          >
-            <Feather name="settings" size={20} color="rgba(255,255,255,0.9)" />
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pressable
+              style={[styles.settingsBtn, { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10 }]}
+              onPress={() => setCalcVisible(true)}
+            >
+              <Feather name="percent" size={18} color="rgba(255,255,255,0.9)" />
+            </Pressable>
+            <Pressable
+              style={styles.settingsBtn}
+              onPress={() => router.push("/settings")}
+            >
+              <Feather name="settings" size={20} color="rgba(255,255,255,0.9)" />
+            </Pressable>
+          </View>
         </View>
 
         <View style={[styles.searchBar, { backgroundColor: "rgba(255,255,255,0.15)" }]}>

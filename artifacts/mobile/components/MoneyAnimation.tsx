@@ -5,17 +5,18 @@ const { width } = Dimensions.get("window");
 const BILL_W = Math.min(width * 0.7, 260);
 const BILL_H = BILL_W * 0.44;
 
-function BillSVG({ color = "#85BB65", opacity = 1 }: { color?: string; opacity?: number }) {
+function BillSVG({ color = "#2E7D32", opacity = 1, amt = "$100" }: { color?: string; opacity?: number; amt?: string }) {
   return (
-    <View style={[styles.bill, { width: BILL_W, height: BILL_H, opacity, backgroundColor: color, borderRadius: 6 }]}>
-      <View style={[styles.billInner, { borderColor: "rgba(255,255,255,0.3)" }]}>
+    <View style={[styles.bill, { width: BILL_W, height: BILL_H, opacity, backgroundColor: color, borderRadius: 6, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 }]}>
+      <View style={[styles.billInner, { borderColor: "rgba(255,255,255,0.35)" }]}>
         <View style={styles.billCenter}>
-          <View style={[styles.billOval, { backgroundColor: "rgba(255,255,255,0.15)" }]} />
-          <Text style={styles.billAmt}>$100</Text>
+          <View style={[styles.billOval, { backgroundColor: "rgba(255,255,255,0.18)" }]} />
+          <Text style={styles.billAmt}>{amt}</Text>
+          <Text style={styles.billLabel}>BONUS</Text>
         </View>
         <View style={styles.billStripes}>
           {[0,1,2].map(i => (
-            <View key={i} style={[styles.billStripe, { backgroundColor: "rgba(255,255,255,0.08)" }]} />
+            <View key={i} style={[styles.billStripe, { backgroundColor: "rgba(255,255,255,0.1)" }]} />
           ))}
         </View>
       </View>
@@ -117,11 +118,11 @@ export default function MoneyAnimation() {
           </View>
           <View style={styles.slot}>
             <Animated.View style={{ transform: [{ translateX: billX }] }}>
-              <BillSVG color="#3D7A3E" />
+              <BillSVG color="#1B5E20" amt={`$${[200, 300, 500, 750][cycle.current % 4]}`} />
             </Animated.View>
             {cycle.current >= 3 && (
               <Animated.View style={[styles.bill2, { transform: [{ translateX: bill2X }] }]}>
-                <BillSVG color="#2E6B2F" />
+                <BillSVG color="#2E7D32" amt="$500" />
               </Animated.View>
             )}
           </View>
@@ -185,6 +186,7 @@ const styles = StyleSheet.create({
   billCenter: { alignItems: "center", justifyContent: "center", flex: 1 },
   billOval: { position: "absolute", width: 60, height: 60, borderRadius: 30 },
   billAmt: { fontFamily: "Inter_700Bold", fontSize: 18, color: "rgba(255,255,255,0.9)" },
+  billLabel: { fontFamily: "Inter_600SemiBold", fontSize: 9, color: "rgba(255,255,255,0.6)", letterSpacing: 1.5, marginTop: 2 },
   billStripes: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "space-around" },
   billStripe: { height: 1 },
   bill2: { position: "absolute" },
