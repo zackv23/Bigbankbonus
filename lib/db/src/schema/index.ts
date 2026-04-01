@@ -24,3 +24,4 @@ export * from "./autopaySchedules";
 export * from "./subscriptions";
 export * from "./monitor";
 export * from "./fileUploads";
+export * from "./userProfiles";

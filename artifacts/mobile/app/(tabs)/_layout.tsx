@@ -85,6 +85,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="strategy"
+        options={{
+          title: "Strategy",
+          tabBarIcon: ({ color }) =>
+            isIOS ? <SymbolView name="brain.head.profile" tintColor={color} size={24} /> : <Feather name="target" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="agent"
         options={{
           title: "AI Agent",

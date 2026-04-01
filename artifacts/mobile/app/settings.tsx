@@ -3,8 +3,9 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Sharing from "expo-sharing";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Platform,
   Pressable,
@@ -13,6 +14,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
   useColorScheme,
 } from "react-native";
@@ -47,6 +49,133 @@ function SettingsRow({ icon, label, sublabel, onPress, right, tint }: {
     </Pressable>
   );
 }
+
+function BankScoreSection({ userId, c, isDark }: { userId: string; c: typeof Colors.light; isDark: boolean }) {
+  const [bankScore, setBankScore] = useState("");
+  const [ewsScore, setEwsScore] = useState("");
+  const [savedScore, setSavedScore] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [loadingScore, setLoadingScore] = useState(true);
+
+  useEffect(() => {
+    const fetchScore = async () => {
+      try {
+        const domain = process.env.EXPO_PUBLIC_DOMAIN;
+        const baseUrl = domain ? `https://${domain}` : "http://localhost:8080";
+        const res = await fetch(`${baseUrl}/api/profile/score?userId=${encodeURIComponent(userId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.bankScore) {
+            setSavedScore(data.bankScore);
+            setBankScore(String(data.bankScore));
+          }
+          if (data.ewsScore) setEwsScore(String(data.ewsScore));
+        }
+      } catch {}
+      setLoadingScore(false);
+    };
+    fetchScore();
+  }, [userId]);
+
+  const handleSave = async () => {
+    const scoreNum = parseInt(bankScore, 10);
+    if (isNaN(scoreNum) || scoreNum < 100 || scoreNum > 900) {
+      Alert.alert("Invalid Score", "Please enter a valid score between 100 and 900.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const domain = process.env.EXPO_PUBLIC_DOMAIN;
+      const baseUrl = domain ? `https://${domain}` : "http://localhost:8080";
+      const body: Record<string, any> = { userId, bankScore: scoreNum };
+      if (ewsScore) body.ewsScore = parseInt(ewsScore, 10);
+      const res = await fetch(`${baseUrl}/api/profile/score`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setSavedScore(scoreNum);
+        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(
+          "Score Saved",
+          scoreNum >= 700
+            ? `Your score of ${scoreNum} unlocks AI strategy recommendations! Visit the Strategy tab to see your personalized plan.`
+            : `Score saved. A score of 700+ unlocks personalized AI strategy recommendations.`
+        );
+      }
+    } catch {
+      Alert.alert("Error", "Could not save your score. Please try again.");
+    }
+    setSaving(false);
+  };
+
+  const scoreColor = savedScore
+    ? savedScore >= 750 ? "#4CAF50" : savedScore >= 700 ? "#FFB300" : "#F44336"
+    : c.textSecondary;
+
+  return (
+    <View style={bsStyles.wrap}>
+      <View style={bsStyles.header}>
+        <LinearGradient colors={["#833AB4", "#E1306C"]} style={bsStyles.headerIcon}>
+          <Feather name="target" size={14} color="#fff" />
+        </LinearGradient>
+        <View style={{ flex: 1 }}>
+          <Text style={[bsStyles.title, { color: c.text }]}>Bank Score</Text>
+          <Text style={[bsStyles.subtitle, { color: c.textSecondary }]}>Score 700+ unlocks AI strategy</Text>
+        </View>
+        {savedScore && (
+          <View style={[bsStyles.scoreBadge, { backgroundColor: scoreColor + "22" }]}>
+            <Text style={[bsStyles.scoreBadgeText, { color: scoreColor }]}>{savedScore}</Text>
+          </View>
+        )}
+      </View>
+
+      {loadingScore ? (
+        <ActivityIndicator color="#833AB4" style={{ marginVertical: 10 }} />
+      ) : (
+        <>
+          <Text style={[bsStyles.label, { color: c.textSecondary }]}>ChexSystems / EWS Score</Text>
+          <TextInput
+            style={[bsStyles.input, { backgroundColor: c.backgroundSecondary, color: c.text, borderColor: c.cardBorder }]}
+            placeholder="e.g. 720"
+            placeholderTextColor={c.textTertiary}
+            value={bankScore}
+            onChangeText={t => setBankScore(t.replace(/\D/g, "").slice(0, 3))}
+            keyboardType="number-pad"
+            maxLength={3}
+          />
+          <Text style={[bsStyles.hint, { color: c.textTertiary }]}>
+            {bankScore && parseInt(bankScore) >= 700
+              ? "Excellent! Your score qualifies for AI recommendations."
+              : "Score of 700+ required to unlock personalized AI strategy."}
+          </Text>
+          <Pressable onPress={handleSave} disabled={saving} style={bsStyles.saveBtn}>
+            <LinearGradient colors={["#833AB4", "#E1306C"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={bsStyles.saveBtnGrad}>
+              {saving ? <ActivityIndicator color="#fff" size="small" /> : <><Feather name="check" size={14} color="#fff" /><Text style={bsStyles.saveBtnText}>Save Score</Text></>}
+            </LinearGradient>
+          </Pressable>
+        </>
+      )}
+    </View>
+  );
+}
+
+const bsStyles = StyleSheet.create({
+  wrap: { marginHorizontal: 16, marginTop: 20 },
+  header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  headerIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 13, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 1 },
+  subtitle: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+  scoreBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  scoreBadgeText: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  label: { fontSize: 12, fontFamily: "Inter_600SemiBold", marginBottom: 6 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 18, fontFamily: "Inter_700Bold", marginBottom: 6 },
+  hint: { fontSize: 11, fontFamily: "Inter_400Regular", marginBottom: 12 },
+  saveBtn: { borderRadius: 12, overflow: "hidden" },
+  saveBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12 },
+  saveBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff" },
+});
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -139,6 +268,11 @@ export default function SettingsScreen() {
             <Feather name="arrow-right" size={16} color="#fff" />
           </LinearGradient>
         </Pressable>
+
+        {/* Bank Score Section */}
+        <View style={[sStyles.sectionCard, { backgroundColor: c.card, borderColor: c.cardBorder, marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderRadius: 16, overflow: "hidden" }]}>
+          <BankScoreSection userId={user?.id ?? "demo-user"} c={c} isDark={isDark} />
+        </View>
 
         <View style={sStyles.section}>
           <Text style={[sStyles.sectionLabel, { color: c.textSecondary }]}>SECURITY</Text>

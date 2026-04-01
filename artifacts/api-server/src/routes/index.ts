@@ -9,6 +9,7 @@ import authRouter from "./auth";
 import monitorRouter from "./monitor";
 import storageRouter from "./storage";
 import uploadsRouter from "./uploads";
+import recommendationsRouter from "./recommendations";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(authRouter);
 router.use(monitorRouter);
 router.use(storageRouter);
 router.use(uploadsRouter);
+router.use(recommendationsRouter);
 
 export default router;
