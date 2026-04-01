@@ -4,6 +4,7 @@ import { Hero } from "@/components/sections/Hero";
 import { Stats } from "@/components/sections/Stats";
 import { Features } from "@/components/sections/Features";
 import { HowItWorks } from "@/components/sections/HowItWorks";
+import { AccountSetupForm } from "@/components/sections/AccountSetupForm";
 import { Pricing } from "@/components/sections/Pricing";
 import { Testimonials } from "@/components/sections/Testimonials";
 import { FAQ } from "@/components/sections/FAQ";
@@ -19,6 +20,7 @@ export default function Home() {
         <Stats />
         <Features />
         <HowItWorks />
+        <AccountSetupForm />
         <Pricing />
         <Testimonials />
         <FAQ />

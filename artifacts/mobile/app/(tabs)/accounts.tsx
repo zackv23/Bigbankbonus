@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,7 @@ import Colors from "@/constants/colors";
 import { ManagedAccount, useAccounts } from "@/context/AccountsContext";
 import { useCredits } from "@/context/CreditsContext";
 import { PlaidAccount, PlaidItem, PlaidTransaction, usePlaid } from "@/context/PlaidContext";
+import LiveBalances from "@/components/LiveBalances";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#FFB300",
@@ -150,12 +151,40 @@ function EditAccountModal({ account, visible, onClose }: { account: ManagedAccou
   const insets = useSafeAreaInsets();
 
   const [accountNum, setAccountNum] = useState(account?.accountNumber || "");
+  const [accountConfirm, setAccountConfirm] = useState("");
+  const [accountMismatch, setAccountMismatch] = useState(false);
   const [routingNum, setRoutingNum] = useState(account?.routingNumber || "");
   const [deposited, setDeposited] = useState(account?.deposited?.toString() || "0");
   const [notes, setNotes] = useState(account?.notes || "");
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (visible) {
+      setAccountNum(account?.accountNumber || "");
+      setAccountConfirm("");
+      setAccountMismatch(false);
+      setRoutingNum(account?.routingNumber || "");
+      setDeposited(account?.deposited?.toString() || "0");
+      setNotes(account?.notes || "");
+      setSaveError(null);
+    }
+  }, [visible, account]);
+
+  const routingValid = routingNum.length === 9;
 
   const handleSave = async () => {
     if (!account) return;
+    if (accountNum && accountNum !== accountConfirm) {
+      setAccountMismatch(true);
+      setSaveError("Account numbers don't match — please re-enter to confirm.");
+      return;
+    }
+    if (routingNum && routingNum.length !== 9) {
+      setSaveError("Routing number must be exactly 9 digits.");
+      return;
+    }
+    setSaveError(null);
+    setAccountMismatch(false);
     await updateAccount(account.id, {
       accountNumber: accountNum,
       routingNumber: routingNum,
@@ -175,27 +204,53 @@ function EditAccountModal({ account, visible, onClose }: { account: ManagedAccou
           <Text style={[styles.modalSubtitle, { color: c.textSecondary }]}>{account?.bankName}</Text>
 
           <ScrollView showsVerticalScrollIndicator={false}>
+            {/* ── Account Number ── */}
             <Text style={[styles.inputLabel, { color: c.textSecondary }]}>Account Number</Text>
             <TextInput
               style={[styles.inputField, { backgroundColor: c.backgroundSecondary, color: c.text, borderColor: c.cardBorder }]}
               placeholder="Enter account number"
               placeholderTextColor={c.textTertiary}
               value={accountNum}
-              onChangeText={setAccountNum}
+              onChangeText={t => { setAccountNum(t.replace(/\D/g, "")); setAccountMismatch(false); setSaveError(null); }}
               keyboardType="numeric"
               secureTextEntry
+              maxLength={17}
             />
 
+            {/* ── Confirm Account Number ── */}
+            <Text style={[styles.inputLabel, { color: c.textSecondary }]}>Confirm Account Number</Text>
+            <TextInput
+              style={[styles.inputField, { backgroundColor: c.backgroundSecondary, color: c.text, borderColor: accountMismatch ? "#F44336" : c.cardBorder }]}
+              placeholder="Re-enter account number"
+              placeholderTextColor={c.textTertiary}
+              value={accountConfirm}
+              onChangeText={t => { setAccountConfirm(t.replace(/\D/g, "")); setAccountMismatch(false); setSaveError(null); }}
+              keyboardType="numeric"
+              secureTextEntry
+              maxLength={17}
+            />
+            {accountMismatch && (
+              <Text style={styles.editErrText}>Account numbers don't match</Text>
+            )}
+
+            {/* ── Routing Number ── */}
             <Text style={[styles.inputLabel, { color: c.textSecondary }]}>Routing Number</Text>
             <TextInput
-              style={[styles.inputField, { backgroundColor: c.backgroundSecondary, color: c.text, borderColor: c.cardBorder }]}
-              placeholder="Enter routing number"
+              style={[styles.inputField, { backgroundColor: c.backgroundSecondary, color: c.text, borderColor: routingNum.length > 0 && !routingValid ? "#FFB300" : c.cardBorder }]}
+              placeholder="9-digit routing number"
               placeholderTextColor={c.textTertiary}
               value={routingNum}
-              onChangeText={setRoutingNum}
+              onChangeText={t => { setRoutingNum(t.replace(/\D/g, "").slice(0, 9)); setSaveError(null); }}
               keyboardType="numeric"
+              maxLength={9}
             />
+            {routingNum.length > 0 && (
+              <Text style={[styles.routingCountEdit, { color: routingValid ? "#4CAF50" : c.textTertiary }]}>
+                {routingNum.length}/9 digits{routingValid ? " ✓" : ""}
+              </Text>
+            )}
 
+            {/* ── Deposited Amount ── */}
             <Text style={[styles.inputLabel, { color: c.textSecondary }]}>Deposited Amount ($)</Text>
             <TextInput
               style={[styles.inputField, { backgroundColor: c.backgroundSecondary, color: c.text, borderColor: c.cardBorder }]}
@@ -206,6 +261,7 @@ function EditAccountModal({ account, visible, onClose }: { account: ManagedAccou
               keyboardType="decimal-pad"
             />
 
+            {/* ── Notes ── */}
             <Text style={[styles.inputLabel, { color: c.textSecondary }]}>Notes</Text>
             <TextInput
               style={[styles.inputField, styles.notesField, { backgroundColor: c.backgroundSecondary, color: c.text, borderColor: c.cardBorder }]}
@@ -216,6 +272,8 @@ function EditAccountModal({ account, visible, onClose }: { account: ManagedAccou
               multiline
               numberOfLines={3}
             />
+
+            {saveError && <Text style={styles.editErrText}>{saveError}</Text>}
 
             <Pressable style={styles.saveBtn} onPress={handleSave}>
               <LinearGradient colors={["#833AB4", "#E1306C"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.saveBtnGrad}>
@@ -352,6 +410,14 @@ export default function AccountsScreen() {
   const { availableCredits, totalCredits } = useCredits();
   const { items: plaidItems, isLoading: plaidLoading, linkBank, totalLinkedBalance, directDepositsDetected, bonusesDetected } = usePlaid();
   const [editingAccount, setEditingAccount] = useState<ManagedAccount | null>(null);
+  const [screenFocused, setScreenFocused] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setScreenFocused(true);
+      return () => setScreenFocused(false);
+    }, [])
+  );
 
   const activeItems = plaidItems.filter(i => i.status === "active");
 
@@ -424,6 +490,10 @@ export default function AccountsScreen() {
             )}
           </View>
         </View>
+
+        {activeItems.length > 0 && (
+          <LiveBalances style={styles.liveBalances} isFocused={screenFocused} />
+        )}
 
         {activeItems.map(item => (
           <PlaidItemCard key={item.itemId} item={item} isDark={isDark} />
@@ -604,4 +674,7 @@ const styles = StyleSheet.create({
   saveBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
   cancelBtn: { borderWidth: 1, borderRadius: 14, paddingVertical: 14, alignItems: "center", marginTop: 10 },
   cancelBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  editErrText: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#F44336", marginTop: 4 },
+  routingCountEdit: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", marginTop: 2 },
+  liveBalances: { marginBottom: 4 },
 });

@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -23,6 +23,8 @@ import { BANKS, Bank, getEWSFreebanks, getNoMinimumBanks, sortByBonusAmount, sor
 import { useAccounts } from "@/context/AccountsContext";
 import AutopayModal, { calcAutopay } from "@/components/AutopayModal";
 import ROICCalculator from "@/components/ROICCalculator";
+import LiveBalances from "@/components/LiveBalances";
+import { usePlaid } from "@/context/PlaidContext";
 
 interface DoCBonus {
   id: number;
@@ -328,6 +330,16 @@ export default function DiscoverScreen() {
   const [docSort, setDocSort] = useState<DocSortType>("rank");
   const [calcVisible, setCalcVisible] = useState(false);
   const { bonuses: docBonuses, loading: docLoading } = useDoCBonuses();
+  const { items: plaidItems } = usePlaid();
+  const hasLinkedAccounts = plaidItems.some(i => i.status === "active");
+  const [screenFocused, setScreenFocused] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setScreenFocused(true);
+      return () => setScreenFocused(false);
+    }, [])
+  );
 
   const banks = useMemo(() => {
     let result = [...BANKS];
@@ -483,8 +495,12 @@ export default function DiscoverScreen() {
         data={banks}
         keyExtractor={b => b.id}
         renderItem={({ item }) => <BankCard bank={item} />}
-        ListHeaderComponent={docBonuses.length > 0 || docLoading ? (
+        ListHeaderComponent={docBonuses.length > 0 || docLoading || hasLinkedAccounts ? (
           <View style={[styles.docSection, { backgroundColor: c.background }]}>
+            {hasLinkedAccounts && (
+              <LiveBalances style={styles.hubLiveBalances} isFocused={screenFocused} />
+            )}
+            {(docBonuses.length > 0 || docLoading) && (
             <View style={styles.docSectionHeader}>
               <View style={styles.docSectionTitleRow}>
                 <Feather name="zap" size={14} color="#E1306C" />
@@ -494,9 +510,10 @@ export default function DiscoverScreen() {
                 {docLoading ? "Loading…" : `${sortedDocBonuses.length} offers`} · Tap to open
               </Text>
             </View>
+            )}
 
             {/* DoC sort chips */}
-            {!docLoading && (
+            {!docLoading && docBonuses.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.docSortScroll}>
                 {DOC_SORT_OPTIONS.map(opt => {
                   const active = docSort === opt.key;
@@ -522,15 +539,19 @@ export default function DiscoverScreen() {
                 <ActivityIndicator color="#833AB4" size="small" />
                 <Text style={[styles.docLoadingText, { color: c.textSecondary }]}>Fetching live bonuses...</Text>
               </View>
-            ) : (
+            ) : docBonuses.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.docScroll}>
                 {sortedDocBonuses.map(b => (
                   <DoCBonusCard key={b.id} bonus={b} isDark={isDark} />
                 ))}
               </ScrollView>
+            ) : null}
+            {(docBonuses.length > 0 || docLoading) && (
+              <>
+                <View style={[styles.docDivider, { backgroundColor: c.separator }]} />
+                <Text style={[styles.allBanksLabel, { color: c.textSecondary }]}>All Banks in Database</Text>
+              </>
             )}
-            <View style={[styles.docDivider, { backgroundColor: c.separator }]} />
-            <Text style={[styles.allBanksLabel, { color: c.textSecondary }]}>All Banks in Database</Text>
           </View>
         ) : null}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 80) }]}
@@ -626,4 +647,5 @@ const styles = StyleSheet.create({
   roicVal: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#333" },
   roicLabel: { fontSize: 9, fontFamily: "Inter_400Regular", marginTop: 1 },
   roicDivider: { width: 1, height: 24 },
+  hubLiveBalances: { marginHorizontal: 16, marginBottom: 12 },
 });
