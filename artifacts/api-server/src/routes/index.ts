@@ -7,6 +7,8 @@ import autopayRouter from "./autopay";
 import subscriptionsRouter from "./subscriptions";
 import authRouter from "./auth";
 import monitorRouter from "./monitor";
+import storageRouter from "./storage";
+import uploadsRouter from "./uploads";
 
 const router: IRouter = Router();
 
@@ -18,5 +20,7 @@ router.use(autopayRouter);
 router.use(subscriptionsRouter);
 router.use(authRouter);
 router.use(monitorRouter);
+router.use(storageRouter);
+router.use(uploadsRouter);
 
 export default router;

@@ -48,6 +48,12 @@ export function Navbar() {
             <button onClick={() => scrollTo("how-it-works")} className="text-sm font-medium text-slate-300 hover:text-white transition-colors">How it Works</button>
             <button onClick={() => scrollTo("pricing")} className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Pricing</button>
             <button onClick={() => scrollTo("faq")} className="text-sm font-medium text-slate-300 hover:text-white transition-colors">FAQ</button>
+            <Link
+              href="/hub"
+              className="text-sm font-medium text-brand-pink hover:text-brand-orange transition-colors"
+            >
+              Command Hub
+            </Link>
             <Link 
               href="/" 
               className="bg-gradient-brand text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-brand-pink/25 hover:shadow-brand-pink/40 hover:-translate-y-0.5 transition-all duration-300"

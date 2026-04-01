@@ -24,6 +24,8 @@ Production-ready iOS/Android app for BigBankBonus.com built with Expo React Nati
 - **Post-Approval Checklist** — 8-step "What To Do Next" screen at `/checklist` (mobile). Persistent state via AsyncStorage. Accessible from the Accounts tab when an account is approved.
 - **Marketing Website** — Static React/Vite landing page at `/website/` with hero, stats, features, pricing, testimonials, FAQ, framer-motion animations. Pricing shows approval-gated $6/mo + $99 model.
 - **EWS & ChexSystems Policy Monitor** — Backend monitoring engine checking 1,004+ public endpoints (CFPB, Reddit, DoC, bank newsrooms, federal/state regulators, aggregators) every 6 hours. Stores events in `monitor_events` table, run history in `monitor_runs`, and source health in `source_health`. Gated behind Pro subscription. Exposed via `/api/monitor/*` routes. Dashboard visible in mobile Monitor tab and website Monitor section.
+- **Command Hub** — Unified hub screen (mobile "Hub" tab + website `/hub` route) with: Plaid Primary Bank Card (live balance, account list, refresh), ChexSystems Report Card (free report link, tips), and File Upload Center (PDF/image upload to Replit Object Storage, file list with delete). Auth-gated: website shows login prompt for unauthenticated users; all upload/storage API routes require `Authorization: Bearer <userId>` header.
+- **Object Storage** — Replit App Storage (GCS-backed) for user file uploads; presigned URL flow via `POST /api/storage/uploads/request-url`; file metadata tracked in `file_uploads` DB table; DELETE removes both DB row and backing storage object.
 
 ## Stack
 

@@ -77,6 +77,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="hub"
+        options={{
+          title: "Hub",
+          tabBarIcon: ({ color }) =>
+            isIOS ? <SymbolView name="square.grid.2x2" tintColor={color} size={24} /> : <Feather name="command" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="agent"
         options={{
           title: "AI Agent",
