@@ -20,6 +20,7 @@ Production-ready iOS/Android app for BigBankBonus.com built with Expo React Nati
 - **Instagram Gradient Theme** — #833AB4 → #E1306C → #F77737 throughout
 - **Subscription Model** — Free / Pro Monthly $9.99 / Pro Annual $83.88; `/api/subscriptions/*` routes; `subscriptionsTable` DB schema; full in-app upgrade screen at `/subscription`
 - **Marketing Website** — Static React/Vite landing page at `/website/` with hero, stats, features, pricing toggle, testimonials, FAQ, framer-motion animations
+- **EWS & ChexSystems Policy Monitor** — Backend monitoring engine checking 1,004+ public endpoints (CFPB, Reddit, DoC, bank newsrooms, federal/state regulators, aggregators) every 6 hours. Stores events in `monitor_events` table, run history in `monitor_runs`, and source health in `source_health`. Gated behind Pro subscription. Exposed via `/api/monitor/*` routes. Dashboard visible in mobile Monitor tab and website Monitor section.
 
 ## Stack
 

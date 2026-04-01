@@ -6,6 +6,7 @@ import plaidRouter from "./plaid";
 import autopayRouter from "./autopay";
 import subscriptionsRouter from "./subscriptions";
 import authRouter from "./auth";
+import monitorRouter from "./monitor";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(plaidRouter);
 router.use(autopayRouter);
 router.use(subscriptionsRouter);
 router.use(authRouter);
+router.use(monitorRouter);
 
 export default router;

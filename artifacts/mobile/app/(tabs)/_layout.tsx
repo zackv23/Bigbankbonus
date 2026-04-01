@@ -84,6 +84,14 @@ export default function TabLayout() {
             isIOS ? <SymbolView name="sparkles" tintColor={color} size={24} /> : <Feather name="zap" size={22} color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="monitor"
+        options={{
+          title: "Monitor",
+          tabBarIcon: ({ color }) =>
+            isIOS ? <SymbolView name="shield.checkered" tintColor={color} size={24} /> : <Feather name="shield" size={22} color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

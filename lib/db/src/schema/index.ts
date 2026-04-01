@@ -22,3 +22,4 @@ export * from "./docBonuses";
 export * from "./plaidItems";
 export * from "./autopaySchedules";
 export * from "./subscriptions";
+export * from "./monitor";
