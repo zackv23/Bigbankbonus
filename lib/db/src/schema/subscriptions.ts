@@ -22,9 +22,11 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptionsTable).o
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
 export type Subscription = typeof subscriptionsTable.$inferSelect;
 
-// Pricing constants
+// Pricing constants — billing is only triggered after account approval
 export const PLANS = {
   free: { name: "Free", monthlyPrice: 0, annualPrice: 0, annualMonthly: 0 },
-  monthly: { name: "Pro Monthly", monthlyPrice: 9.99, annualPrice: null, annualMonthly: null },
-  annual:  { name: "Pro Annual",  monthlyPrice: null, annualPrice: 83.88, annualMonthly: 6.99 },
+  monthly: { name: "Pro Monthly", monthlyPrice: 6.00, annualPrice: null, annualMonthly: null },
+  annual:  { name: "Pro Annual",  monthlyPrice: null, annualPrice: 72.00, annualMonthly: 6.00 },
 } as const;
+
+export const SERVICE_FEE = 99; // one-time service fee charged on approval

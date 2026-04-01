@@ -11,6 +11,8 @@ export const userAccountsTable = pgTable("user_accounts", {
   bonusAmount: integer("bonus_amount").notNull().default(0),
   directDepositRequired: integer("direct_deposit_required").notNull().default(0),
   status: text("status").notNull().default("pending"),
+  approvalStatus: text("approval_status").notNull().default("pending"),
+  approvedAt: timestamp("approved_at"),
   openedAt: timestamp("opened_at").defaultNow(),
   bonusReceivedAt: timestamp("bonus_received_at"),
   createdAt: timestamp("created_at").defaultNow(),

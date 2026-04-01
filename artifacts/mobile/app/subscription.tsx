@@ -1,29 +1,26 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { type ComponentProps } from "react";
 import {
-  ActivityIndicator,
   Linking,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
   useColorScheme,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { useAuth } from "@/context/AuthContext";
 
-const MONTHLY_PRICE = 9.99;
-const ANNUAL_PRICE = 83.88;
-const ANNUAL_MONTHLY_EQUIV = 6.99;
-const DISCOUNT_PCT = 30;
+type FeatherIconName = ComponentProps<typeof Feather>["name"];
 
-const PRO_FEATURES = [
+const MONTHLY_PRICE = 6.00;
+const SERVICE_FEE = 99;
+
+const PRO_FEATURES: { icon: FeatherIconName; label: string; sub: string }[] = [
   { icon: "zap",         label: "All Live Deals",          sub: "200+ DoC.com offers, updated daily" },
   { icon: "cpu",         label: "AI Bonus Agent",           sub: "GPT-4o strategy chat, personalized" },
   { icon: "refresh-cw",  label: "Autopay DD Scheduler",     sub: "We cycle deposits & refund your card" },
@@ -32,79 +29,18 @@ const PRO_FEATURES = [
   { icon: "download",    label: "Analytics Export",         sub: "Export earnings history as CSV" },
 ];
 
-const ANNUAL_ONLY = [
-  { icon: "star",   label: "Early Access",          sub: "New features before public release" },
-  { icon: "shield", label: "Dedicated Account Mgr", sub: "Priority email + chat support" },
+const HOW_IT_WORKS = [
+  { step: "1", text: "Sign up free — no credit card needed" },
+  { step: "2", text: "Apply for a bank account through the app" },
+  { step: "3", text: "Once your account is approved, billing starts" },
+  { step: "4", text: "$99 service fee + $6/mo subscription activated" },
 ];
-
-type Plan = "monthly" | "annual";
 
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const c = isDark ? Colors.dark : Colors.light;
-  const { user } = useAuth() as any;
-
-  const [billingAnnual, setBillingAnnual] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [subscribed, setSubscribed] = useState(false);
-
-  const selectedPlan: Plan = billingAnnual ? "annual" : "monthly";
-  const displayPrice = billingAnnual ? ANNUAL_MONTHLY_EQUIV : MONTHLY_PRICE;
-  const billingNote = billingAnnual
-    ? `$${ANNUAL_PRICE.toFixed(2)} billed annually`
-    : "billed monthly, cancel anytime";
-
-  const handleSubscribe = async () => {
-    setLoading(true);
-    try {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN;
-      const url = domain
-        ? `https://${domain}/api/subscriptions/subscribe`
-        : "http://localhost:8080/api/subscriptions/subscribe";
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user?.id ?? "demo-user",
-          plan: selectedPlan,
-          stripePaymentMethodId: "demo",
-          email: user?.email ?? "demo@bigbankbonus.com",
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSubscribed(true);
-      }
-    } catch {
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (subscribed) {
-    return (
-      <View style={[s.container, { backgroundColor: c.background, paddingTop: insets.top }]}>
-        <View style={s.successWrap}>
-          <LinearGradient colors={["#833AB4", "#E1306C", "#F77737"]} style={s.successIcon}>
-            <Feather name="check" size={36} color="#fff" />
-          </LinearGradient>
-          <Text style={[s.successTitle, { color: c.text }]}>Welcome to Pro!</Text>
-          <Text style={[s.successSub, { color: c.textSecondary }]}>
-            Your {billingAnnual ? "annual" : "monthly"} subscription is active.{"\n"}
-            All Pro features are now unlocked.
-          </Text>
-          <Pressable style={s.successBtn} onPress={() => router.back()}>
-            <LinearGradient colors={["#833AB4", "#E1306C", "#F77737"]} style={s.successBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={s.successBtnText}>Start Exploring</Text>
-              <Feather name="arrow-right" size={16} color="#fff" />
-            </LinearGradient>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View style={[s.container, { backgroundColor: c.background }]}>
@@ -120,42 +56,68 @@ export default function SubscriptionScreen() {
         </LinearGradient>
 
         <View style={s.body}>
-          {/* Billing toggle */}
-          <View style={[s.toggleCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
-            <View style={s.toggleRow}>
-              <Text style={[s.toggleLabel, { color: billingAnnual ? c.textSecondary : c.text }]}>Monthly</Text>
-              <Switch
-                value={billingAnnual}
-                onValueChange={setBillingAnnual}
-                trackColor={{ false: "#ccc", true: "#833AB4" }}
-                thumbColor="#fff"
-              />
-              <View style={s.annualLabelRow}>
-                <Text style={[s.toggleLabel, { color: billingAnnual ? c.text : c.textSecondary }]}>Annual</Text>
-                <View style={s.saveBadge}>
-                  <Text style={s.saveBadgeText}>SAVE {DISCOUNT_PCT}%</Text>
-                </View>
-              </View>
+          {/* Free to sign up banner */}
+          <View style={[s.freeBanner, { backgroundColor: isDark ? "#0d2b0d" : "#f0faf0", borderColor: "#4CAF50" }]}>
+            <Feather name="shield" size={18} color="#4CAF50" />
+            <View style={{ flex: 1 }}>
+              <Text style={[s.freeBannerTitle, { color: c.text }]}>Free to Sign Up</Text>
+              <Text style={[s.freeBannerSub, { color: c.textSecondary }]}>
+                No credit card required. You're only charged after your bank account is approved.
+              </Text>
             </View>
           </View>
 
-          {/* Price card */}
-          <LinearGradient colors={["#833AB4cc", "#E1306Ccc"]} style={s.priceCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            {billingAnnual && (
-              <View style={s.bestValueBadge}>
-                <Text style={s.bestValueText}>BEST VALUE</Text>
-              </View>
-            )}
+          {/* Pricing breakdown */}
+          <View style={[s.pricingCard, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
+            <Text style={[s.pricingTitle, { color: c.text }]}>Approval-Gated Pricing</Text>
+            <Text style={[s.pricingSubtitle, { color: c.textSecondary }]}>Charged only after approval</Text>
+
             <View style={s.priceRow}>
-              <Text style={s.priceCurrency}>$</Text>
-              <Text style={s.priceAmount}>{displayPrice.toFixed(2)}</Text>
-              <Text style={s.priceInterval}>/mo</Text>
+              <LinearGradient colors={["#833AB4", "#E1306C"]} style={s.priceIcon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <Feather name="repeat" size={14} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.priceLabel, { color: c.text }]}>Monthly Subscription</Text>
+                <Text style={[s.priceSub, { color: c.textSecondary }]}>Billed monthly, cancel anytime</Text>
+              </View>
+              <Text style={[s.priceAmount, { color: c.text }]}>$6<Text style={[s.priceInterval, { color: c.textSecondary }]}>/mo</Text></Text>
             </View>
-            <Text style={s.billingNote}>{billingNote}</Text>
-            {billingAnnual && (
-              <Text style={s.savingsNote}>You save ${(MONTHLY_PRICE * 12 - ANNUAL_PRICE).toFixed(2)}/year</Text>
-            )}
-          </LinearGradient>
+
+            <View style={[s.divider, { backgroundColor: c.separator }]} />
+
+            <View style={s.priceRow}>
+              <LinearGradient colors={["#F77737", "#E1306C"]} style={s.priceIcon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <Feather name="dollar-sign" size={14} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.priceLabel, { color: c.text }]}>One-Time Service Fee</Text>
+                <Text style={[s.priceSub, { color: c.textSecondary }]}>Charged once when approved</Text>
+              </View>
+              <Text style={[s.priceAmount, { color: c.text }]}>$99</Text>
+            </View>
+
+            <View style={[s.approvalNote, { backgroundColor: isDark ? "rgba(131,58,180,0.15)" : "#faf5ff", borderColor: "#833AB4" }]}>
+              <Feather name="info" size={13} color="#833AB4" />
+              <Text style={[s.approvalNoteText, { color: c.textSecondary }]}>
+                Billing is triggered automatically when a BigBankBonus operator marks your account as approved.
+              </Text>
+            </View>
+          </View>
+
+          {/* How billing works */}
+          <View style={s.sectionBlock}>
+            <Text style={[s.sectionTitle, { color: c.text }]}>How Billing Works</Text>
+            {HOW_IT_WORKS.map((step) => (
+              <View key={step.step} style={[s.stepRow, { borderBottomColor: c.separator }]}>
+                <View style={s.stepBadge}>
+                  <LinearGradient colors={["#833AB4", "#E1306C"]} style={s.stepBadgeGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                    <Text style={s.stepNum}>{step.step}</Text>
+                  </LinearGradient>
+                </View>
+                <Text style={[s.stepText, { color: c.text }]}>{step.text}</Text>
+              </View>
+            ))}
+          </View>
 
           {/* Pro features */}
           <View style={s.sectionBlock}>
@@ -163,7 +125,7 @@ export default function SubscriptionScreen() {
             {PRO_FEATURES.map(f => (
               <View key={f.icon} style={[s.featureRow, { borderBottomColor: c.separator }]}>
                 <LinearGradient colors={["#833AB4", "#E1306C"]} style={s.featureIcon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                  <Feather name={f.icon as any} size={13} color="#fff" />
+                  <Feather name={f.icon} size={13} color="#fff" />
                 </LinearGradient>
                 <View style={{ flex: 1 }}>
                   <Text style={[s.featureLabel, { color: c.text }]}>{f.label}</Text>
@@ -173,25 +135,6 @@ export default function SubscriptionScreen() {
               </View>
             ))}
           </View>
-
-          {/* Annual-only perks */}
-          {billingAnnual && (
-            <View style={[s.sectionBlock, { borderTopWidth: 1, borderTopColor: c.separator, paddingTop: 12 }]}>
-              <Text style={[s.sectionTitle, { color: "#833AB4" }]}>Annual Exclusive</Text>
-              {ANNUAL_ONLY.map(f => (
-                <View key={f.icon} style={[s.featureRow, { borderBottomColor: c.separator }]}>
-                  <LinearGradient colors={["#F77737", "#E1306C"]} style={s.featureIcon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                    <Feather name={f.icon as any} size={13} color="#fff" />
-                  </LinearGradient>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.featureLabel, { color: c.text }]}>{f.label}</Text>
-                    <Text style={[s.featureSub, { color: c.textSecondary }]}>{f.sub}</Text>
-                  </View>
-                  <Feather name="check" size={14} color="#F77737" />
-                </View>
-              ))}
-            </View>
-          )}
 
           {/* Stats */}
           <View style={[s.statsRow, { backgroundColor: isDark ? "#ffffff08" : "#f9f5ff" }]}>
@@ -207,24 +150,8 @@ export default function SubscriptionScreen() {
             ))}
           </View>
 
-          {/* CTA */}
-          <Pressable onPress={handleSubscribe} disabled={loading} style={{ marginTop: 8 }}>
-            <LinearGradient colors={["#833AB4", "#E1306C", "#F77737"]} style={[s.cta, loading && { opacity: 0.7 }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Feather name="zap" size={18} color="#fff" />
-                  <Text style={s.ctaText}>
-                    Start Pro — ${displayPrice.toFixed(2)}/mo
-                  </Text>
-                </>
-              )}
-            </LinearGradient>
-          </Pressable>
-
           <Text style={[s.disclaimer, { color: c.textTertiary }]}>
-            Cancel anytime · No hidden fees · Secure payments via Stripe
+            Free to join · Billed only after approval · Secure payments via Stripe
           </Text>
 
           {/* Free plan comparison */}
@@ -257,23 +184,48 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: 32, fontFamily: "Inter_700Bold", color: "#fff", lineHeight: 38, marginBottom: 8 },
   headerSub: { fontSize: 14, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)" },
   body: { padding: 16, gap: 14 },
-  toggleCard: { borderRadius: 16, borderWidth: 1, padding: 14 },
-  toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
-  toggleLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  annualLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  saveBadge: { backgroundColor: "#4CAF50", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  saveBadgeText: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#fff" },
-  priceCard: { borderRadius: 20, padding: 22, alignItems: "center", gap: 4, overflow: "hidden" },
-  bestValueBadge: { position: "absolute", top: 12, right: 12, backgroundColor: "#F77737", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  bestValueText: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#fff" },
-  priceRow: { flexDirection: "row", alignItems: "flex-start" },
-  priceCurrency: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#fff", marginTop: 6 },
-  priceAmount: { fontSize: 56, fontFamily: "Inter_700Bold", color: "#fff", lineHeight: 64 },
-  priceInterval: { fontSize: 18, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", alignSelf: "flex-end", marginBottom: 8 },
-  billingNote: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)" },
-  savingsNote: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#fff", backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginTop: 4 },
+  freeBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+  },
+  freeBannerTitle: { fontSize: 14, fontFamily: "Inter_700Bold", marginBottom: 2 },
+  freeBannerSub: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  pricingCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  pricingTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  pricingSubtitle: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: -8 },
+  priceRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  priceIcon: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  priceLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  priceSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+  priceAmount: { fontSize: 22, fontFamily: "Inter_700Bold" },
+  priceInterval: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  divider: { height: StyleSheet.hairlineWidth },
+  approvalNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 4,
+  },
+  approvalNoteText: { flex: 1, fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 16 },
   sectionBlock: { gap: 2 },
   sectionTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
+  stepRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  stepBadge: { width: 30, height: 30 },
+  stepBadgeGrad: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  stepNum: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#fff" },
+  stepText: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
   featureRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   featureIcon: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   featureLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
@@ -282,18 +234,9 @@ const s = StyleSheet.create({
   statItem: { flex: 1, alignItems: "center" },
   statVal: { fontSize: 18, fontFamily: "Inter_700Bold" },
   statLbl: { fontSize: 10, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 2 },
-  cta: { borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16 },
-  ctaText: { fontSize: 17, fontFamily: "Inter_700Bold", color: "#fff" },
   disclaimer: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center" },
   freeCard: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 6 },
   freeTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", marginBottom: 4 },
   freeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   freeLine: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  successWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 16 },
-  successIcon: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center" },
-  successTitle: { fontSize: 28, fontFamily: "Inter_700Bold" },
-  successSub: { fontSize: 15, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
-  successBtn: { borderRadius: 14, overflow: "hidden", width: "100%", marginTop: 8 },
-  successBtnGrad: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16 },
-  successBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
 });

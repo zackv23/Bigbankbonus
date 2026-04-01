@@ -18,8 +18,11 @@ Production-ready iOS/Android app for BigBankBonus.com built with Expo React Nati
 - **Chrome Extension AutoFill Template** — Downloadable JSON for bank signup form autofill
 - **Apple/Google Auth + Biometrics + PIN** — Complete auth flow with expo-local-authentication
 - **Instagram Gradient Theme** — #833AB4 → #E1306C → #F77737 throughout
-- **Subscription Model** — Free / Pro Monthly $9.99 / Pro Annual $83.88; `/api/subscriptions/*` routes; `subscriptionsTable` DB schema; full in-app upgrade screen at `/subscription`
-- **Marketing Website** — Static React/Vite landing page at `/website/` with hero, stats, features, pricing toggle, testimonials, FAQ, framer-motion animations
+- **Approval-Gated Billing** — Sign-up is always free (no CC). Billing ($6/mo + $99 one-time service fee) activates only after admin marks a user account as approved. Admin endpoint: `POST /api/admin/accounts/:id/approval` (requires ADMIN_SECRET env var). Subscription creation gated server-side on `approvalStatus = approved`.
+- **Subscription Model** — Free / Pro Monthly $6/mo; `/api/subscriptions/*` routes; `subscriptionsTable` DB schema; full in-app upgrade screen at `/subscription`; pricing endpoint at `/api/subscriptions/prices`
+- **One-Free-Account Enforcement** — Server-side: `POST /api/accounts` blocks second active account per user with `ONE_FREE_ACCOUNT_LIMIT` error. Client-side: AccountsContext also enforces this locally.
+- **Post-Approval Checklist** — 8-step "What To Do Next" screen at `/checklist` (mobile). Persistent state via AsyncStorage. Accessible from the Accounts tab when an account is approved.
+- **Marketing Website** — Static React/Vite landing page at `/website/` with hero, stats, features, pricing, testimonials, FAQ, framer-motion animations. Pricing shows approval-gated $6/mo + $99 model.
 - **EWS & ChexSystems Policy Monitor** — Backend monitoring engine checking 1,004+ public endpoints (CFPB, Reddit, DoC, bank newsrooms, federal/state regulators, aggregators) every 6 hours. Stores events in `monitor_events` table, run history in `monitor_runs`, and source health in `source_health`. Gated behind Pro subscription. Exposed via `/api/monitor/*` routes. Dashboard visible in mobile Monitor tab and website Monitor section.
 
 ## Stack

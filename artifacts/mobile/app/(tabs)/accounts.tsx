@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import {
   View,
   useColorScheme,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
@@ -401,6 +402,8 @@ function PlaidItemCard({ item, isDark }: { item: PlaidItem; isDark: boolean }) {
   );
 }
 
+const SEEN_APPROVALS_KEY = "bbb_seen_approvals";
+
 export default function AccountsScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
@@ -411,6 +414,7 @@ export default function AccountsScreen() {
   const { items: plaidItems, isLoading: plaidLoading, linkBank, totalLinkedBalance, directDepositsDetected, bonusesDetected } = usePlaid();
   const [editingAccount, setEditingAccount] = useState<ManagedAccount | null>(null);
   const [screenFocused, setScreenFocused] = useState(false);
+  const navigatedRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -418,6 +422,24 @@ export default function AccountsScreen() {
       return () => setScreenFocused(false);
     }, [])
   );
+
+  // Auto-navigate to checklist the first time an approved account is detected
+  useEffect(() => {
+    if (navigatedRef.current) return;
+    const approvedAccounts = accounts.filter(a => a.approvalStatus === "approved");
+    if (approvedAccounts.length === 0) return;
+
+    AsyncStorage.getItem(SEEN_APPROVALS_KEY).then(raw => {
+      const seen: string[] = raw ? JSON.parse(raw) : [];
+      const newlyApproved = approvedAccounts.find(a => !seen.includes(a.id));
+      if (!newlyApproved) return;
+
+      navigatedRef.current = true;
+      const updatedSeen = [...seen, newlyApproved.id];
+      AsyncStorage.setItem(SEEN_APPROVALS_KEY, JSON.stringify(updatedSeen));
+      router.push({ pathname: "/checklist", params: { bankName: newlyApproved.bankName } });
+    });
+  }, [accounts]);
 
   const activeItems = plaidItems.filter(i => i.status === "active");
 
@@ -519,6 +541,23 @@ export default function AccountsScreen() {
           Plaid securely connects to 12,000+ US banks. Your credentials are never shared.
         </Text>
       </View>
+
+      {/* Post-approval checklist quick access */}
+      {accounts.some(a => a.approvalStatus === "approved") && (
+        <Pressable
+          style={[styles.checklistBanner, { backgroundColor: isDark ? "rgba(76,175,80,0.12)" : "#f0faf5", borderColor: "#4CAF50" }]}
+          onPress={() => router.push({ pathname: "/checklist", params: { bankName: accounts.find(a => a.approvalStatus === "approved")?.bankName ?? "Your Bank" } })}
+        >
+          <LinearGradient colors={["#4CAF50", "#66BB6A"]} style={styles.checklistBannerIcon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <Feather name="check-circle" size={16} color="#fff" />
+          </LinearGradient>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.checklistBannerTitle, { color: c.text }]}>Account Approved!</Text>
+            <Text style={[styles.checklistBannerSub, { color: c.textSecondary }]}>View your post-approval checklist →</Text>
+          </View>
+          <Feather name="chevron-right" size={16} color="#4CAF50" />
+        </Pressable>
+      )}
 
       {accounts.length > 0 && (
         <View style={[styles.sectionHeader, { borderColor: c.cardBorder }]}>
@@ -677,4 +716,23 @@ const styles = StyleSheet.create({
   editErrText: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#F44336", marginTop: 4 },
   routingCountEdit: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", marginTop: 2 },
   liveBalances: { marginBottom: 4 },
+  checklistBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    margin: 16,
+    marginBottom: 0,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+  },
+  checklistBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checklistBannerTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  checklistBannerSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
 });

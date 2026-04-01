@@ -50,17 +50,31 @@ export default function BankDetailScreen() {
 
   const handleAddAccount = async () => {
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await addAccount({
+    const result = await addAccount({
       bankId: bank.id,
       bankName: bank.name,
       bonusAmount: bank.bonusAmount,
       directDepositRequired: bank.directDepositRequired,
       status: "pending",
+      approvalStatus: "pending",
       openedDate: openDate,
       deposited: 0,
       notes: "",
       logoColor: bank.logoColor,
     });
+
+    if (!result.success) {
+      setShowAddModal(false);
+      Alert.alert(
+        "One Account Limit",
+        result.error ?? "Only one free account is allowed at a time.",
+        [
+          { text: "View My Accounts", onPress: () => router.push("/(tabs)/accounts") },
+          { text: "OK" },
+        ]
+      );
+      return;
+    }
 
     const amount = parseFloat(deployAmount) || bank.directDepositRequired;
     if (availableCredits >= amount) {
@@ -87,7 +101,7 @@ export default function BankDetailScreen() {
     }
 
     setShowAddModal(false);
-    Alert.alert("Account Added!", `${bank.name} has been added to your accounts. Deposits have been auto-scheduled on your calendar.`, [
+    Alert.alert("Account Added!", `${bank.name} has been added to your accounts. We'll notify you once your account is approved — billing starts only after approval.`, [
       { text: "View Accounts", onPress: () => router.push("/(tabs)/accounts") },
       { text: "Stay Here" },
     ]);

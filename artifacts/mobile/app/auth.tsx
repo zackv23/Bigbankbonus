@@ -197,6 +197,13 @@ export default function AuthScreen() {
             Track and automate your earnings.
           </Text>
 
+          <View style={styles.freeSignupBanner}>
+            <Feather name="shield" size={14} color="#4CAF50" />
+            <Text style={styles.freeSignupText}>
+              Free to sign up — no credit card required.{"\n"}You're only charged after approval.
+            </Text>
+          </View>
+
           <View style={styles.buttons}>
             {/* Apple Sign In — shown only on iOS where it's available */}
             {appleAvailable && (
@@ -342,6 +349,24 @@ const styles = StyleSheet.create({
   divider: { flexDirection: "row", alignItems: "center", gap: 10 },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: "rgba(255,255,255,0.25)" },
   dividerText: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.4)" },
+  freeSignupBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: "rgba(76,175,80,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(76,175,80,0.35)",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  freeSignupText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.9)",
+    lineHeight: 18,
+  },
   legal: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
