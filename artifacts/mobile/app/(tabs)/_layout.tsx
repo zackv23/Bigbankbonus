@@ -69,6 +69,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="stacking"
+        options={{
+          title: "Stacking",
+          tabBarIcon: ({ color }) =>
+            isIOS ? <SymbolView name="square.stack.3d.up" tintColor={color} size={24} /> : <Feather name="layers" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="agent"
         options={{
           title: "AI Agent",

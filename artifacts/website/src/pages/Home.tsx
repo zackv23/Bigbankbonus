@@ -5,6 +5,7 @@ import { Stats } from "@/components/sections/Stats";
 import { Features } from "@/components/sections/Features";
 import { HowItWorks } from "@/components/sections/HowItWorks";
 import { AccountSetupForm } from "@/components/sections/AccountSetupForm";
+import { BankStackingGuide } from "@/components/sections/BankStackingGuide";
 import { Pricing } from "@/components/sections/Pricing";
 import { Testimonials } from "@/components/sections/Testimonials";
 import { FAQ } from "@/components/sections/FAQ";
@@ -21,6 +22,7 @@ export default function Home() {
         <Features />
         <HowItWorks />
         <AccountSetupForm />
+        <BankStackingGuide />
         <Pricing />
         <Testimonials />
         <FAQ />

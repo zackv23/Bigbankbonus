@@ -26,6 +26,8 @@ import ROICCalculator from "@/components/ROICCalculator";
 import LiveBalances from "@/components/LiveBalances";
 import { usePlaid } from "@/context/PlaidContext";
 
+type DoCOfferType = "personal_checking" | "personal_savings" | "business_checking" | "business_savings" | "credit_card" | "other";
+
 interface DoCBonus {
   id: number;
   title: string;
@@ -43,6 +45,27 @@ interface DoCBonus {
   rank?: number;
   nationwide?: boolean;
   stateRestriction?: string;
+  offerType?: DoCOfferType;
+}
+
+const OFFER_TYPE_META: Record<DoCOfferType, { label: string; icon: string; color: string }> = {
+  personal_checking: { label: "Personal Checking", icon: "credit-card",  color: "#2196F3" },
+  personal_savings:  { label: "Personal Savings",  icon: "dollar-sign",  color: "#4CAF50" },
+  business_checking: { label: "Business Checking", icon: "briefcase",    color: "#FF9800" },
+  business_savings:  { label: "Business Savings",  icon: "trending-up",  color: "#9C27B0" },
+  credit_card:       { label: "Credit Card",        icon: "award",        color: "#E1306C" },
+  other:             { label: "Other",              icon: "tag",          color: "#9E9E9E" },
+};
+
+function derivedOfferType(section?: string | null): DoCOfferType {
+  if (!section) return "other";
+  const s = section.toLowerCase();
+  if (s === "checking") return "personal_checking";
+  if (s === "savings")  return "personal_savings";
+  if (s === "business") return "business_checking";
+  if (s === "business_savings" || s === "biz_savings") return "business_savings";
+  if (s === "credit_card" || s === "credit-card" || s === "credit") return "credit_card";
+  return "other";
 }
 
 function useDoCBonuses() {
@@ -80,8 +103,9 @@ function DoCBonusCard({ bonus, isDark }: { bonus: DoCBonus; isDark: boolean }) {
   const amount = bonus.bonusAmount;
   const isSoft = bonus.pullType === "soft";
   const needsDD = bonus.directDepositInfo && !bonus.directDepositInfo.toLowerCase().includes("not required");
-  const sectionLabel = bonus.section ? SECTION_LABELS[bonus.section] : null;
   const targetUrl = bonus.offerLink ?? bonus.link;
+  const offerType: DoCOfferType = bonus.offerType ?? derivedOfferType(bonus.section);
+  const typeMeta = OFFER_TYPE_META[offerType];
 
   // ROIC/APY — only when there's a bonus amount and no hard monthly minimum
   const roic = amount && amount > 0 ? calcAutopay(amount) : null;
@@ -111,8 +135,11 @@ function DoCBonusCard({ bonus, isDark }: { bonus: DoCBonus; isDark: boolean }) {
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={[styles.docCardTitle, { color: c.text }]} numberOfLines={2}>{bonus.bankName ?? bonus.title}</Text>
-            {sectionLabel && (
-              <Text style={[styles.docSectionTag, { color: "#833AB4" }]}>{sectionLabel} Account</Text>
+            {offerType !== "other" && (
+              <View style={[styles.offerTypeTag, { backgroundColor: typeMeta.color + "20" }]}>
+                <Feather name={typeMeta.icon as any} size={9} color={typeMeta.color} />
+                <Text style={[styles.offerTypeTagText, { color: typeMeta.color }]}>{typeMeta.label}</Text>
+              </View>
             )}
           </View>
           {/* Autopay button — right side */}
@@ -214,6 +241,22 @@ function DoCBonusCard({ bonus, isDark }: { bonus: DoCBonus; isDark: boolean }) {
 type FilterType = "all" | "no-ews" | "no-minimum" | "no-biometrics";
 type SortType = "bonus" | "percentage" | "time" | "rating";
 type DocSortType = "rank" | "bonus" | "soft" | "nodd" | "apy";
+type DocCategoryFilter = "all" | "personal_checking" | "personal_savings" | "business_checking" | "business_savings" | "credit_card";
+
+const DOC_CATEGORY_CHIPS: { key: DocCategoryFilter; label: string; icon: string; color: string }[] = [
+  { key: "all",               label: "All",              icon: "grid",        color: "#833AB4" },
+  { key: "personal_checking", label: "Personal Chk",    icon: "credit-card", color: "#2196F3" },
+  { key: "personal_savings",  label: "Personal Sav",    icon: "dollar-sign", color: "#4CAF50" },
+  { key: "business_checking", label: "Business Chk",    icon: "briefcase",   color: "#FF9800" },
+  { key: "business_savings",  label: "Business Sav",    icon: "trending-up", color: "#9C27B0" },
+  { key: "credit_card",       label: "Credit Cards",    icon: "award",       color: "#E1306C" },
+];
+
+function bonusCategoryFilter(bonus: DoCBonus): DocCategoryFilter {
+  const t = bonus.offerType ?? derivedOfferType(bonus.section);
+  if (t === "other") return "all";
+  return t as DocCategoryFilter;
+}
 
 const FILTER_CHIPS: { key: FilterType; label: string; icon: string }[] = [
   { key: "all", label: "All Banks", icon: "grid" },
@@ -328,6 +371,7 @@ export default function DiscoverScreen() {
   const [sort, setSort] = useState<SortType>("bonus");
   const [minBonus, setMinBonus] = useState("");
   const [docSort, setDocSort] = useState<DocSortType>("rank");
+  const [docCategory, setDocCategory] = useState<DocCategoryFilter>("all");
   const [calcVisible, setCalcVisible] = useState(false);
   const { bonuses: docBonuses, loading: docLoading } = useDoCBonuses();
   const { items: plaidItems } = usePlaid();
@@ -357,7 +401,10 @@ export default function DiscoverScreen() {
   }, [filter, sort, search, minBonus]);
 
   const sortedDocBonuses = useMemo(() => {
-    const list = [...docBonuses];
+    let list = [...docBonuses];
+    if (docCategory !== "all") {
+      list = list.filter(b => bonusCategoryFilter(b) === docCategory);
+    }
     switch (docSort) {
       case "bonus":
         return list.sort((a, b) => (b.bonusAmount ?? 0) - (a.bonusAmount ?? 0));
@@ -385,7 +432,7 @@ export default function DiscoverScreen() {
       default:
         return list.sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999));
     }
-  }, [docBonuses, docSort]);
+  }, [docBonuses, docSort, docCategory]);
 
   const noEWSCount = BANKS.filter(b => !b.ewsReporting).length;
 
@@ -512,6 +559,33 @@ export default function DiscoverScreen() {
             </View>
             )}
 
+            {/* DoC category filter chips */}
+            {!docLoading && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.docSortScroll}>
+                {DOC_CATEGORY_CHIPS.map(chip => {
+                  const active = docCategory === chip.key;
+                  return (
+                    <Pressable
+                      key={chip.key}
+                      style={[
+                        styles.docCategoryChip,
+                        active
+                          ? { backgroundColor: chip.color, borderColor: chip.color }
+                          : { borderColor: chip.color + "66" },
+                      ]}
+                      onPress={() => {
+                        if (Platform.OS !== "web") Haptics.selectionAsync();
+                        setDocCategory(chip.key);
+                      }}
+                    >
+                      <Feather name={chip.icon as any} size={10} color={active ? "#fff" : chip.color} />
+                      <Text style={[styles.docSortChipText, { color: active ? "#fff" : chip.color }]}>{chip.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+
             {/* DoC sort chips */}
             {!docLoading && docBonuses.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.docSortScroll}>
@@ -635,6 +709,9 @@ const styles = StyleSheet.create({
   docSortChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: "#833AB4", backgroundColor: "transparent" },
   docSortChipActive: { backgroundColor: "#833AB4", borderColor: "#833AB4" },
   docSortChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  docCategoryChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, backgroundColor: "transparent" },
+  offerTypeTag: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6, alignSelf: "flex-start" },
+  offerTypeTagText: { fontSize: 9, fontFamily: "Inter_600SemiBold" },
 
   // Autopay button
   autopayBtn: { borderRadius: 8, overflow: "hidden" },
