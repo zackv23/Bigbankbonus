@@ -10,6 +10,7 @@ import monitorRouter from "./monitor";
 import storageRouter from "./storage";
 import uploadsRouter from "./uploads";
 import recommendationsRouter from "./recommendations";
+import depositRouter from "./deposit";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(monitorRouter);
 router.use(storageRouter);
 router.use(uploadsRouter);
 router.use(recommendationsRouter);
+router.use(depositRouter);
 
 export default router;

@@ -26,6 +26,7 @@ import { ManagedAccount, useAccounts } from "@/context/AccountsContext";
 import { useCredits } from "@/context/CreditsContext";
 import { PlaidAccount, PlaidItem, PlaidTransaction, usePlaid } from "@/context/PlaidContext";
 import LiveBalances from "@/components/LiveBalances";
+import DepositEarnModal from "@/components/DepositEarnModal";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#FFB300",
@@ -413,6 +414,7 @@ export default function AccountsScreen() {
   const { availableCredits, totalCredits } = useCredits();
   const { items: plaidItems, isLoading: plaidLoading, linkBank, totalLinkedBalance, directDepositsDetected, bonusesDetected } = usePlaid();
   const [editingAccount, setEditingAccount] = useState<ManagedAccount | null>(null);
+  const [depositEarnVisible, setDepositEarnVisible] = useState(false);
   const [screenFocused, setScreenFocused] = useState(false);
   const navigatedRef = useRef(false);
 
@@ -484,6 +486,19 @@ export default function AccountsScreen() {
             <Text style={styles.statBoxLabel}>Deployed</Text>
           </View>
         </View>
+
+        {/* Deposit & Earn CTA */}
+        <Pressable
+          style={styles.depositEarnBtn}
+          onPress={() => setDepositEarnVisible(true)}
+        >
+          <Feather name="zap" size={16} color="#F77737" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.depositEarnTitle}>Deposit & Earn · $500 → $5k–$10k</Text>
+            <Text style={styles.depositEarnSub}>10x–20x leverage · ACH sent next Monday</Text>
+          </View>
+          <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.6)" />
+        </Pressable>
       </View>
 
       {/* Plaid Section */}
@@ -587,6 +602,11 @@ export default function AccountsScreen() {
           visible={!!editingAccount}
           onClose={() => setEditingAccount(null)}
         />
+        <DepositEarnModal
+          visible={depositEarnVisible}
+          onClose={() => setDepositEarnVisible(false)}
+          stackedOffersCount={accounts.length > 0 ? accounts.length : 5}
+        />
       </View>
     );
   }
@@ -606,6 +626,11 @@ export default function AccountsScreen() {
         visible={!!editingAccount}
         onClose={() => setEditingAccount(null)}
       />
+      <DepositEarnModal
+        visible={depositEarnVisible}
+        onClose={() => setDepositEarnVisible(false)}
+        stackedOffersCount={accounts.length > 0 ? accounts.length : 5}
+      />
     </View>
   );
 }
@@ -623,10 +648,13 @@ const styles = StyleSheet.create({
   creditSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.6)" },
   buyCreditsBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
   buyCreditsText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#fff" },
-  statsRow: { flexDirection: "row", gap: 8 },
+  statsRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
   statBox: { flex: 1, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 12, padding: 10, alignItems: "center" },
   statBoxValue: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
   statBoxLabel: { fontSize: 10, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.7)", marginTop: 2 },
+  depositEarnBtn: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(0,0,0,0.25)", borderRadius: 14, padding: 12, borderWidth: 1, borderColor: "rgba(247,119,55,0.4)" },
+  depositEarnTitle: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#fff" },
+  depositEarnSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.65)", marginTop: 2 },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
   emptyTitle: { fontSize: 20, fontFamily: "Inter_600SemiBold" },
   emptySubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },

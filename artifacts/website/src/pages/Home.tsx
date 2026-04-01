@@ -8,6 +8,7 @@ import { AccountSetupForm } from "@/components/sections/AccountSetupForm";
 import { BankStackingGuide } from "@/components/sections/BankStackingGuide";
 import { Monitor } from "@/components/sections/Monitor";
 import { PersonalizedStrategy } from "@/components/sections/PersonalizedStrategy";
+import { DepositEarn } from "@/components/sections/DepositEarn";
 import { Pricing } from "@/components/sections/Pricing";
 import { Testimonials } from "@/components/sections/Testimonials";
 import { FAQ } from "@/components/sections/FAQ";
@@ -25,6 +26,7 @@ export default function Home() {
         <HowItWorks />
         <AccountSetupForm />
         <BankStackingGuide />
+        <DepositEarn />
         <Monitor />
         <PersonalizedStrategy />
         <Pricing />
