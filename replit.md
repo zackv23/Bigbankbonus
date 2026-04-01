@@ -112,3 +112,10 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+## Version History & Rollback
+
+The codebase was snapshotted before V2.0 development began. See [CHANGELOG.md](./CHANGELOG.md) for the full V1 feature inventory and git rollback instructions.
+
+- **Tag:** `v1.0-stable` — V1 stable baseline (2026-04-01)
+- **Rollback:** `git checkout -b restore/v1.0-stable v1.0-stable`
