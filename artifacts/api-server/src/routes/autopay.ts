@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, autopaySchedulesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+import { triggerAutopayTick } from "../lib/autopayScheduler";
 
 const router = Router();
 
@@ -82,6 +83,13 @@ router.post("/autopay/create", async (req, res) => {
   const ddInDate = addBusinessDays(ddOutDate, 5);
   const refundDate = addBusinessDays(ddInDate, 3);
 
+  const MAX_CYCLES    = 18;
+  const PROGRAM_DAYS  = 91;
+  const endsAt        = new Date(now.getTime() + PROGRAM_DAYS * 86_400_000);
+  // First push fires on the next business day at 9AM ET (approx 14:00 UTC)
+  const firstPushAt   = new Date(nextBusinessDay(now));
+  firstPushAt.setUTCHours(14, 0, 0, 0);
+
   const isDemo = !STRIPE_SECRET || stripePaymentMethodId === "demo";
   let stripeChargeId: string | null = null;
   let stripeBankTokenId: string | null = null;
@@ -137,9 +145,16 @@ router.post("/autopay/create", async (req, res) => {
       ddAmount,
       chargeAmount,
       achAmount,
+      leverageChargeAmount: 1000,
       ddOutDate,
       ddInDate,
       refundDate,
+      // 91-day lifecycle fields
+      endsAt,
+      maxCycles:      MAX_CYCLES,
+      cycleCount:     0,
+      nextActionAt:   firstPushAt,
+      nextActionType: "push",
       status: isDemo ? "charged" : (stripeChargeId ? "charged" : "pending_charge"),
       stripeChargeId,
       demo: isDemo,
@@ -228,6 +243,31 @@ router.post("/autopay/:id/execute-push", async (req, res) => {
     .where(eq(autopaySchedulesTable.id, id));
 
   res.json({ success: true, transferOutId });
+});
+
+// ─── POST /autopay/tick — manually trigger lifecycle tick (dev/admin) ─────────
+router.post("/autopay/tick", async (_req, res) => {
+  try {
+    await triggerAutopayTick();
+    res.json({ success: true, message: "Tick executed" });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── PATCH /autopay/:id/set-action — manually set nextActionAt for testing ────
+router.patch("/autopay/:id/set-action", async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { nextActionType, minutesFromNow } = req.body as {
+    nextActionType: "push" | "pull" | "final_refund";
+    minutesFromNow?: number;
+  };
+  const nextActionAt = new Date(Date.now() + ((minutesFromNow ?? 0) * 60_000));
+  await db
+    .update(autopaySchedulesTable)
+    .set({ nextActionAt, nextActionType, updatedAt: new Date() })
+    .where(eq(autopaySchedulesTable.id, id));
+  res.json({ success: true, nextActionAt, nextActionType });
 });
 
 // ─── GET /autopay/amounts?bonusAmount=... — calculate amounts ─────────────────

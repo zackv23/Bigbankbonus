@@ -12,7 +12,8 @@ Production-ready iOS/Android app for BigBankBonus.com built with Expo React Nati
 - **AI Agent** — OpenAI GPT-4o-mini powered assistant with streaming SSE responses for bonus strategy
 - **Deposit/Withdrawal Calendar Scheduler** — Auto-schedules direct deposits across accounts
 - **Stripe Payment Processing** — $2k credit purchases at 0.75% fee
-- **Autopay DD Scheduler** — Per-offer autopay button with account/routing modal, ROIC/APY display (1× and 3× monthly), full Stripe ACH cycle: CC charge → ACH push (5 biz days) → ACH pull → CC refund
+- **Autopay DD Scheduler** — 91-day program: `charged → ach_push_sent → ach_pull_settled` repeating up to 18 cycles. ACH push at 9AM ET on next biz day; ACH pull 2 biz days later at 2PM ET. After `maxCycles` or `endsAt`: 48-hour wait → CC refund. Plaid Transfer used for ACH (not Stripe). Stripe used for subscription fees and final CC refund only.
+- **Autopay Lifecycle Scheduler** — `autopayScheduler.ts` polls DB every 60 s, processes schedules where `nextActionAt <= now`. Actions: `push` (ACH credit → target account), `pull` (ACH debit ← target account), `final_refund` (Stripe CC refund). Operates in demo mode when Plaid credentials absent. Manual trigger: `POST /api/autopay/tick`. Sends email/SMS/push notifications at each step.
 - **Account & Routing Number Management** — Double-entry verified account number, routing validation, masked display
 - **Performance Analytics** — ROI, earned/pending bonuses, deployment metrics
 - **Chrome Extension AutoFill Template** — Downloadable JSON for bank signup form autofill
