@@ -19,18 +19,26 @@ export const autopaySchedulesTable = pgTable("autopay_schedules", {
   stripePaymentMethodId: text("stripe_payment_method_id"),
 
   // Amounts (in whole dollars)
-  ddAmount: integer("dd_amount"),      // bonusAmount / 3, rounded up
-  chargeAmount: integer("charge_amount"), // ddAmount + 3% fee, rounded up
-  achAmount: integer("ach_amount"),    // ddAmount + 1 (round up + $1)
+  ddAmount: integer("dd_amount"),
+  chargeAmount: integer("charge_amount"),
+  achAmount: integer("ach_amount"),
+  leverageChargeAmount: integer("leverage_charge_amount"), // fixed $1000 leverage collateral
 
-  // Schedule
-  ddOutDate: timestamp("dd_out_date"),   // next business day = ACH push date
-  ddInDate: timestamp("dd_in_date"),     // 5 business days after ddOutDate = ACH pull date
-  refundDate: timestamp("refund_date"),  // 3 business days after ddInDate = CC refund
+  // 91-day cycle program
+  cycleCount: integer("cycle_count").default(0),
+  maxCycles: integer("max_cycles").default(18),
+  endsAt: timestamp("ends_at"),                       // enrollment + 91 days
+  nextActionAt: timestamp("next_action_at"),          // when to run next push/pull
+  nextActionType: text("next_action_type"),           // "push" | "pull"
+  cycleIntervalBizDays: integer("cycle_interval_biz_days").default(2),
+  discountPct: integer("discount_pct").default(0),   // 25 = 25% off
+
+  // Schedule dates (current cycle)
+  ddOutDate: timestamp("dd_out_date"),
+  ddInDate: timestamp("dd_in_date"),
+  refundDate: timestamp("refund_date"),
 
   // Status lifecycle
-  // pending_charge → charged → ach_push_sent → ach_push_settled →
-  // ach_pull_sent → ach_pull_settled → refunded | cancelled | failed
   status: text("status").notNull().default("pending_charge"),
 
   // Stripe operation IDs
@@ -38,6 +46,10 @@ export const autopaySchedulesTable = pgTable("autopay_schedules", {
   stripeTransferOutId: text("stripe_transfer_out_id"),
   stripeTransferInId: text("stripe_transfer_in_id"),
   stripeRefundId: text("stripe_refund_id"),
+
+  // Notification preferences
+  notifyEmail: text("notify_email"),
+  notifyPhone: text("notify_phone"),
 
   demo: boolean("demo").default(false),
   notes: text("notes"),
