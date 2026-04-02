@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, autopaySchedulesTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { triggerAutopayTick } from "../lib/autopayScheduler";
 
 const router = Router();
@@ -243,6 +243,31 @@ router.post("/autopay/:id/execute-push", async (req, res) => {
     .where(eq(autopaySchedulesTable.id, id));
 
   res.json({ success: true, transferOutId });
+});
+
+// ─── PATCH /autopay/notify-prefs — sync email/phone to all active schedules ───
+router.patch("/autopay/notify-prefs", async (req, res) => {
+  const { userId, notifyEmail, notifyPhone } = req.body as {
+    userId: string;
+    notifyEmail: string | null;
+    notifyPhone: string | null;
+  };
+  if (!userId) return res.status(400).json({ error: "userId required" });
+
+  await db
+    .update(autopaySchedulesTable)
+    .set({ notifyEmail: notifyEmail ?? null, notifyPhone: notifyPhone ?? null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(autopaySchedulesTable.userId, userId),
+        inArray(autopaySchedulesTable.status, [
+          "charged", "ach_push_sent", "ach_push_settled",
+          "ach_pull_sent", "ach_pull_settled",
+        ]),
+      ),
+    );
+
+  res.json({ success: true });
 });
 
 // ─── POST /autopay/tick — manually trigger lifecycle tick (dev/admin) ─────────
