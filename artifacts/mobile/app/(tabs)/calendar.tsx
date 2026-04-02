@@ -18,6 +18,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { router } from "expo-router";
+
 import Colors from "@/constants/colors";
 import { ScheduledEvent, useScheduler } from "@/context/SchedulerContext";
 import { useAccounts } from "@/context/AccountsContext";
@@ -393,9 +395,18 @@ export default function CalendarScreen() {
               {activeSchedules.length > 0 ? `${activeSchedules.length} active DD${activeSchedules.length > 1 ? "s" : ""}` : "No active DDs"}
             </Text>
           </View>
-          <Pressable style={calStyles.addBtn} onPress={() => { if (!selectedDate) setSelectedDate(new Date().toISOString().slice(0, 10)); setAddModalVisible(true); }}>
-            <Feather name="plus" size={20} color="#fff" />
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <Pressable
+              style={[calStyles.addBtn, { flexDirection: "row", gap: 6, paddingHorizontal: 12, width: "auto" as any }]}
+              onPress={() => router.push("/statement")}
+            >
+              <Feather name="file-text" size={15} color="#fff" />
+              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#fff" }}>Statement</Text>
+            </Pressable>
+            <Pressable style={calStyles.addBtn} onPress={() => { if (!selectedDate) setSelectedDate(new Date().toISOString().slice(0, 10)); setAddModalVisible(true); }}>
+              <Feather name="plus" size={20} color="#fff" />
+            </Pressable>
+          </View>
         </View>
 
         <View style={calStyles.monthNav}>

@@ -167,6 +167,7 @@ function RootLayoutNav() {
       <Stack.Screen name="subscription" options={{ headerShown: false, presentation: "modal" }} />
       <Stack.Screen name="offer-upsell" options={{ headerShown: false, presentation: "fullScreenModal" }} />
       <Stack.Screen name="checklist" options={{ headerShown: false, presentation: "modal" }} />
+      <Stack.Screen name="statement" options={{ headerShown: false, presentation: "modal" }} />
     </Stack>
   );
 }

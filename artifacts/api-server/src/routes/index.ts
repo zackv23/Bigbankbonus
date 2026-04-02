@@ -12,6 +12,7 @@ import uploadsRouter from "./uploads";
 import recommendationsRouter from "./recommendations";
 import depositRouter from "./deposit";
 import webhooksRouter from "./webhooks";
+import statementRouter from "./statement";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(uploadsRouter);
 router.use(recommendationsRouter);
 router.use(depositRouter);
 router.use(webhooksRouter);
+router.use(statementRouter);
 
 export default router;
