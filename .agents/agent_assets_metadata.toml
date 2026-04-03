@@ -1,0 +1,38 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "ez48S8_wzEZbo5p-vMcSW"
+uri = "file://artifacts/mobile/assets/images/adaptive-icon.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "v8TOSQ5Xw-ZJuHn0kZM-8"
+uri = "file://artifacts/mobile/assets/store/feature-graphic.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "Dio-Ah5dYDlVi-drwk_ht"
+uri = "file://artifacts/mobile/assets/store/screenshots/android/01-discover.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "l8CCj2GrAvzmQT02JBie1"
+uri = "file://artifacts/mobile/assets/store/screenshots/android/02-accounts.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "2dfsQNC7f7JOb40U9_4gv"
+uri = "file://artifacts/mobile/assets/store/screenshots/android/03-ai-agent.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "1ku0HzVdmSYsogdr2Kmyn"
+uri = "file://artifacts/mobile/assets/store/screenshots/android/04-calendar.png"
+type = "image"
+title = "generated_image"
