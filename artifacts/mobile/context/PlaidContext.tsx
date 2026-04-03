@@ -97,12 +97,15 @@ export function PlaidProvider({ children }: { children: React.ReactNode }) {
 
   const checkConfiguration = async () => {
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
       const res = await fetch(getApiUrl("/plaid/link-token"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: "ping" }),
-        signal: AbortSignal.timeout(5000),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       const data = await res.json();
       setIsConfigured(!data.sandbox && !!data.link_token);
     } catch {
@@ -127,12 +130,15 @@ export function PlaidProvider({ children }: { children: React.ReactNode }) {
     try {
       const userId = await getUserId();
 
+      const linkController = new AbortController();
+      const linkTimer = setTimeout(() => linkController.abort(), 10000);
       const tokenRes = await fetch(getApiUrl("/plaid/link-token"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
-        signal: AbortSignal.timeout(10000),
+        signal: linkController.signal,
       });
+      clearTimeout(linkTimer);
       const tokenData = await tokenRes.json();
 
       if (tokenData.sandbox || tokenData.link_token === "link-sandbox-demo-token") {
