@@ -27,7 +27,9 @@ import { useAuth } from "@/context/AuthContext";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
 
 async function fetchGoogleProfile(accessToken: string) {
   const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
@@ -57,9 +59,11 @@ export default function AuthScreen() {
     }
   }, [emailModalVisible]);
 
-  // Google OAuth
+  // Google OAuth — web client ID drives Expo Go + web; iOS/Android IDs used in native builds
   const [, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    clientId: GOOGLE_CLIENT_ID ?? "",
+    clientId: GOOGLE_WEB_CLIENT_ID ?? "",
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
   });
 
   useEffect(() => {
@@ -94,7 +98,7 @@ export default function AuthScreen() {
 
   // Handlers
   const handleGoogleLogin = async () => {
-    if (!GOOGLE_CLIENT_ID) {
+    if (!GOOGLE_WEB_CLIENT_ID && !GOOGLE_IOS_CLIENT_ID && !GOOGLE_ANDROID_CLIENT_ID) {
       Alert.alert(
         "Google Sign In",
         "Google Sign In isn't configured yet. Use email sign-up or the Demo to get started.",
