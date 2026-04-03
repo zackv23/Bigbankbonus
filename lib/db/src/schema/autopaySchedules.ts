@@ -50,6 +50,11 @@ export const autopaySchedulesTable = pgTable("autopay_schedules", {
   // Notification preferences
   notifyEmail: text("notify_email"),
   notifyPhone: text("notify_phone"),
+  pushToken: text("push_token"),
+
+  // Plaid link — access token + account ID for real ACH transfers
+  plaidAccessToken: text("plaid_access_token"),
+  plaidAccountId: text("plaid_account_id"),
 
   demo: boolean("demo").default(false),
   notes: text("notes"),

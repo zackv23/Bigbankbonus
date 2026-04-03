@@ -170,6 +170,12 @@ export function PlaidProvider({ children }: { children: React.ReactNode }) {
         if (exchangeData.item) {
           const updated = [...items, { ...exchangeData.item, id: Date.now(), createdAt: new Date().toISOString() }];
           await saveItems(updated);
+          // Backfill existing active autopay schedules with this Plaid link
+          fetch(getApiUrl("/autopay/link-plaid"), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId }),
+          }).catch(() => {});
           Alert.alert(
             "Bank Linked (Demo)",
             "Chase Bank (Demo) linked successfully. In production, Plaid securely connects to your real bank.",
@@ -205,6 +211,12 @@ export function PlaidProvider({ children }: { children: React.ReactNode }) {
           if (exchangeData.item) {
             const updated = [...items, { ...exchangeData.item, id: Date.now(), createdAt: new Date().toISOString() }];
             await saveItems(updated);
+            // Backfill existing active autopay schedules with this Plaid link
+            fetch(getApiUrl("/autopay/link-plaid"), {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId }),
+            }).catch(() => {});
           }
         }
       }

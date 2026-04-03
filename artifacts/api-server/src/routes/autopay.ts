@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, autopaySchedulesTable } from "@workspace/db";
+import { db, autopaySchedulesTable, plaidItemsTable } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { triggerAutopayTick } from "../lib/autopayScheduler";
 
@@ -128,6 +128,27 @@ router.post("/autopay/create", async (req, res) => {
     stripeBankTokenId = `demo_bank_${Date.now()}`;
   }
 
+  // ── Look up user's most-recently-linked Plaid item ──────────────────────────
+  let plaidAccessToken: string | null = null;
+  let plaidAccountId: string | null = null;
+  try {
+    const plaidItems = await db
+      .select()
+      .from(plaidItemsTable)
+      .where(and(eq(plaidItemsTable.userId, userId), eq(plaidItemsTable.status, "active")))
+      .orderBy(desc(plaidItemsTable.createdAt))
+      .limit(1);
+
+    if (plaidItems.length > 0) {
+      const item = plaidItems[0];
+      plaidAccessToken = item.accessToken ?? null;
+      // Pick the first checking account; fall back to first account of any type
+      const accounts = (item.accounts ?? []) as any[];
+      const checking = accounts.find((a: any) => a.subtype === "checking") ?? accounts[0];
+      plaidAccountId = checking?.account_id ?? null;
+    }
+  } catch { /* non-fatal — fall back to demo mode */ }
+
   const [schedule] = await db
     .insert(autopaySchedulesTable)
     .values({
@@ -158,10 +179,17 @@ router.post("/autopay/create", async (req, res) => {
       status: isDemo ? "charged" : (stripeChargeId ? "charged" : "pending_charge"),
       stripeChargeId,
       demo: isDemo,
+      // Plaid link — populated if user has a linked bank
+      plaidAccessToken,
+      plaidAccountId,
     })
     .returning();
 
-  res.json({ schedule, ddAmount, chargeAmount, achAmount, ddOutDate, ddInDate, refundDate });
+  res.json({
+    schedule,
+    ddAmount, chargeAmount, achAmount, ddOutDate, ddInDate, refundDate,
+    plaidLinked: !!(plaidAccessToken && plaidAccountId),
+  });
 });
 
 // ─── GET /autopay?userId=... ──────────────────────────────────────────────────
@@ -245,18 +273,24 @@ router.post("/autopay/:id/execute-push", async (req, res) => {
   res.json({ success: true, transferOutId });
 });
 
-// ─── PATCH /autopay/notify-prefs — sync email/phone to all active schedules ───
+// ─── PATCH /autopay/notify-prefs — sync email/phone/pushToken to active schedules
 router.patch("/autopay/notify-prefs", async (req, res) => {
-  const { userId, notifyEmail, notifyPhone } = req.body as {
+  const { userId, notifyEmail, notifyPhone, pushToken } = req.body as {
     userId: string;
-    notifyEmail: string | null;
-    notifyPhone: string | null;
+    notifyEmail?: string | null;
+    notifyPhone?: string | null;
+    pushToken?: string | null;
   };
   if (!userId) return res.status(400).json({ error: "userId required" });
 
+  const updates: Record<string, any> = { updatedAt: new Date() };
+  if (notifyEmail  !== undefined) updates.notifyEmail  = notifyEmail  ?? null;
+  if (notifyPhone  !== undefined) updates.notifyPhone  = notifyPhone  ?? null;
+  if (pushToken    !== undefined) updates.pushToken    = pushToken    ?? null;
+
   await db
     .update(autopaySchedulesTable)
-    .set({ notifyEmail: notifyEmail ?? null, notifyPhone: notifyPhone ?? null, updatedAt: new Date() })
+    .set(updates)
     .where(
       and(
         eq(autopaySchedulesTable.userId, userId),
@@ -268,6 +302,59 @@ router.patch("/autopay/notify-prefs", async (req, res) => {
     );
 
   res.json({ success: true });
+});
+
+// ─── PATCH /autopay/link-plaid — attach Plaid to all active schedules for user
+router.patch("/autopay/link-plaid", async (req, res) => {
+  const { userId } = req.body as { userId: string };
+  if (!userId) return res.status(400).json({ error: "userId required" });
+
+  // Look up the user's most recent active Plaid item
+  const plaidItems = await db
+    .select()
+    .from(plaidItemsTable)
+    .where(and(eq(plaidItemsTable.userId, userId), eq(plaidItemsTable.status, "active")))
+    .orderBy(desc(plaidItemsTable.createdAt))
+    .limit(1);
+
+  if (plaidItems.length === 0) {
+    return res.status(404).json({ error: "No linked Plaid account found" });
+  }
+
+  const item = plaidItems[0];
+  const accounts = (item.accounts ?? []) as any[];
+  const checking  = accounts.find((a: any) => a.subtype === "checking") ?? accounts[0];
+  const plaidAccountId = checking?.account_id ?? null;
+
+  if (!plaidAccountId) {
+    return res.status(400).json({ error: "No checking account found in Plaid item" });
+  }
+
+  await db
+    .update(autopaySchedulesTable)
+    .set({
+      plaidAccessToken: item.accessToken,
+      plaidAccountId,
+      // If the schedule was in demo mode solely due to missing Plaid token,
+      // keep demo flag as-is — user must explicitly confirm to go live.
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(autopaySchedulesTable.userId, userId),
+        inArray(autopaySchedulesTable.status, [
+          "charged", "ach_push_sent", "ach_push_settled",
+          "ach_pull_sent", "ach_pull_settled",
+        ]),
+      ),
+    );
+
+  res.json({
+    success: true,
+    institutionName: item.institutionName,
+    accountMask: checking?.mask ?? "???",
+    plaidAccountId,
+  });
 });
 
 // ─── POST /autopay/tick — manually trigger lifecycle tick (dev/admin) ─────────

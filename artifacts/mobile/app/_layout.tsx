@@ -36,7 +36,7 @@ Notifications.setNotificationHandler({
 });
 
 // ─── Register push token ──────────────────────────────────────────────────────
-async function registerPushToken(): Promise<void> {
+async function registerPushToken(userId?: string): Promise<void> {
   if (Platform.OS === "web") return;
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
@@ -46,6 +46,17 @@ async function registerPushToken(): Promise<void> {
     if (status !== "granted") return;
     const { data: token } = await Notifications.getExpoPushTokenAsync();
     await AsyncStorage.setItem("bbb_push_token", token);
+
+    // Sync to server — writes push token onto all active autopay schedules
+    if (userId) {
+      const domain = process.env.EXPO_PUBLIC_DOMAIN;
+      const base = domain ? `https://${domain}` : "http://localhost:8080";
+      fetch(`${base}/api/autopay/notify-prefs`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, pushToken: token }),
+      }).catch(() => {}); // non-fatal
+    }
   } catch { /* non-fatal */ }
 }
 
@@ -92,7 +103,7 @@ const queryClient = new QueryClient();
 const PUBLIC_SCREENS = ["auth", "legal"];
 
 function RootLayoutNav() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth() as any;
   const segments = useSegments();
   const appState = useRef(AppState.currentState);
   const lastBgTime = useRef<number>(0);
@@ -110,10 +121,10 @@ function RootLayoutNav() {
     }
   }, [isAuthenticated, isLoading, segments]);
 
-  // Register push notifications when user logs in
+  // Register push token and sync to server when user logs in
   useEffect(() => {
-    if (isAuthenticated) registerPushToken();
-  }, [isAuthenticated]);
+    if (isAuthenticated) registerPushToken(user?.id);
+  }, [isAuthenticated, user?.id]);
 
   // Handle notification taps → deep link
   useEffect(() => {
