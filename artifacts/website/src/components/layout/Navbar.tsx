@@ -26,7 +26,9 @@ export function Navbar() {
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? "glass-dark shadow-2xl shadow-black/50 py-3" : "bg-transparent py-5"
+        isScrolled
+          ? "bg-white/88 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.45)] backdrop-blur-xl py-3 border-b border-slate-200/70"
+          : "bg-transparent py-5"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -37,34 +39,35 @@ export function Navbar() {
               alt="BigBankBonus Logo" 
               className="w-8 h-8 group-hover:scale-110 transition-transform duration-300"
             />
-            <span className="font-display font-bold text-xl text-white tracking-tight">
+            <span className={`font-display font-bold text-xl tracking-tight transition-colors ${isScrolled ? "text-slate-950" : "text-slate-950"}`}>
               BigBankBonus
             </span>
           </Link>
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-8">
-            <button onClick={() => scrollTo("features")} className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Features</button>
-            <button onClick={() => scrollTo("how-it-works")} className="text-sm font-medium text-slate-300 hover:text-white transition-colors">How it Works</button>
-            <button onClick={() => scrollTo("pricing")} className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Pricing</button>
-            <button onClick={() => scrollTo("faq")} className="text-sm font-medium text-slate-300 hover:text-white transition-colors">FAQ</button>
+            <button onClick={() => scrollTo("problem")} className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">Problem</button>
+            <button onClick={() => scrollTo("workflow")} className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">Workflow</button>
+            <button onClick={() => scrollTo("solution")} className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">Solution</button>
+            <button onClick={() => scrollTo("roadmap")} className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">Roadmap</button>
+            <button onClick={() => scrollTo("faq")} className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">FAQ</button>
             <Link
               href="/hub"
-              className="text-sm font-medium text-brand-pink hover:text-brand-orange transition-colors"
+              className="text-sm font-medium text-emerald-800 hover:text-emerald-950 transition-colors"
             >
-              Command Hub
+              Product Hub
             </Link>
             <Link 
-              href="/" 
-              className="bg-gradient-brand text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-brand-pink/25 hover:shadow-brand-pink/40 hover:-translate-y-0.5 transition-all duration-300"
+              href="/hub" 
+              className="bg-slate-950 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-all duration-300"
             >
-              Get the App
+              Preview Platform
             </Link>
           </div>
 
           {/* Mobile Menu Toggle */}
           <button 
-            className="md:hidden text-white p-2"
+            className="md:hidden text-slate-950 p-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -79,18 +82,25 @@ export function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden glass-dark border-t border-white/10 mt-3"
+            className="md:hidden mt-3 border-t border-slate-200 bg-white/95 backdrop-blur-xl"
           >
             <div className="flex flex-col px-4 py-6 gap-4">
-              <button onClick={() => scrollTo("features")} className="text-left text-lg font-medium text-slate-200 py-2">Features</button>
-              <button onClick={() => scrollTo("how-it-works")} className="text-left text-lg font-medium text-slate-200 py-2">How it Works</button>
-              <button onClick={() => scrollTo("pricing")} className="text-left text-lg font-medium text-slate-200 py-2">Pricing</button>
-              <button onClick={() => scrollTo("faq")} className="text-left text-lg font-medium text-slate-200 py-2">FAQ</button>
-              <Link 
-                href="/" 
-                className="bg-gradient-brand text-white text-center px-5 py-3 mt-4 rounded-xl text-base font-bold shadow-lg"
+              <button onClick={() => scrollTo("problem")} className="text-left text-lg font-medium text-slate-900 py-2">Problem</button>
+              <button onClick={() => scrollTo("workflow")} className="text-left text-lg font-medium text-slate-900 py-2">Workflow</button>
+              <button onClick={() => scrollTo("solution")} className="text-left text-lg font-medium text-slate-900 py-2">Solution</button>
+              <button onClick={() => scrollTo("roadmap")} className="text-left text-lg font-medium text-slate-900 py-2">Roadmap</button>
+              <button onClick={() => scrollTo("faq")} className="text-left text-lg font-medium text-slate-900 py-2">FAQ</button>
+              <Link
+                href="/hub"
+                className="text-left text-lg font-medium text-emerald-800 py-2"
               >
-                Get the App
+                Product Hub
+              </Link>
+              <Link 
+                href="/hub" 
+                className="bg-slate-950 text-white text-center px-5 py-3 mt-4 rounded-xl text-base font-bold"
+              >
+                Preview Platform
               </Link>
             </div>
           </motion.div>

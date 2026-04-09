@@ -104,7 +104,7 @@ router.delete("/uploads/files/:id", async (req: Request, res: Response) => {
     return;
   }
 
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id));
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid file id" });
     return;

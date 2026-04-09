@@ -1,25 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { db, userAccountsTable, subscriptionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { PRICE_IDS, SERVICE_FEE, activateApprovedSubscription } from "../lib/stripeBilling";
 
 const router = Router();
-const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
-
-const PRICE_IDS = {
-  monthly: process.env.STRIPE_PRICE_MONTHLY ?? "price_monthly_demo",
-  annual:  process.env.STRIPE_PRICE_ANNUAL  ?? "price_annual_demo",
-};
-const SERVICE_FEE = 99.00;
-
-async function stripePost(path: string, body: Record<string, string>): Promise<Record<string, any>> {
-  if (!STRIPE_SECRET) return { demo: true };
-  const res = await fetch(`https://api.stripe.com/v1${path}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${STRIPE_SECRET}`, "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(body),
-  });
-  return res.json() as Promise<Record<string, any>>;
-}
 
 /**
  * requireAdmin — fails closed: denies if ADMIN_SECRET is set and header doesn't match,
@@ -95,9 +79,9 @@ router.post("/auth/social", async (req, res) => {
       });
     }
 
-    res.status(400).json({ error: "Unsupported provider" });
+    return res.status(400).json({ error: "Unsupported provider" });
   } catch (e: any) {
-    res.status(500).json({ error: e?.message ?? "Auth verification failed" });
+    return res.status(500).json({ error: e?.message ?? "Auth verification failed" });
   }
 });
 
@@ -175,65 +159,43 @@ router.post("/admin/accounts/:id/approval", async (req, res) => {
         existingSub.status === "active";
 
       if (!alreadyBilled) {
-        const isDemo = !STRIPE_SECRET;
-        let stripeCustomerId: string | null = null;
-        let stripeSubscriptionId: string | null = null;
-        let currentPeriodEnd: Date | null = null;
+        const hasSavedPaymentMethod = Boolean(existingSub?.stripeDefaultPaymentMethodId);
 
-        if (!isDemo && email) {
-          const customer = await stripePost("/customers", {
-            email,
-            "metadata[userId]": userId,
-          });
-          stripeCustomerId = customer.id;
-
-          const priceId = PRICE_IDS[billingPlan];
-          const subscription = await stripePost("/subscriptions", {
-            customer: stripeCustomerId,
-            "items[0][price]": priceId,
-            "expand[]": "latest_invoice.payment_intent",
-          });
-          stripeSubscriptionId = subscription.id;
-          if (subscription.current_period_end) {
-            currentPeriodEnd = new Date(subscription.current_period_end * 1000);
-          }
-
-          // One-time $99 service fee invoice
-          await stripePost("/invoiceitems", {
-            customer: stripeCustomerId,
-            amount: String(Math.round(SERVICE_FEE * 100)),
-            currency: "usd",
-            description: "BigBankBonus One-Time Service Fee",
-          });
-          await stripePost("/invoices", {
-            customer: stripeCustomerId,
-            auto_advance: "true",
-          });
-        } else {
-          // Demo mode
-          stripeCustomerId = `demo_cus_${userId}`;
-          stripeSubscriptionId = `demo_sub_${Date.now()}`;
-          currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        if (!hasSavedPaymentMethod && process.env.STRIPE_SECRET_KEY) {
+          response.message = "Account approved. Billing is pending because no reusable payment method is on file.";
+          response.billingPendingPaymentMethod = true;
+          response.requiredAction = "Collect a payment method with /api/subscriptions/setup before auto-billing.";
+          return res.json(response);
         }
+
+        const billing = await activateApprovedSubscription({
+          userId,
+          plan: billingPlan,
+          email: email ?? existingSub?.billingEmail ?? undefined,
+          existingCustomerId: existingSub?.stripeCustomerId,
+          defaultPaymentMethodId: existingSub?.stripeDefaultPaymentMethodId ?? undefined,
+        });
 
         // Persist the subscription record
         if (existingSub) {
           await db.update(subscriptionsTable).set({
-            plan: billingPlan, status: "active",
-            stripeCustomerId, stripeSubscriptionId,
+            plan: billingPlan, status: billing.status,
+            stripeCustomerId: billing.stripeCustomerId, stripeSubscriptionId: billing.stripeSubscriptionId,
             stripePriceId: PRICE_IDS[billingPlan],
+            billingEmail: email ?? existingSub.billingEmail ?? undefined,
             currentPeriodStart: new Date(),
-            currentPeriodEnd: currentPeriodEnd ?? undefined,
+            currentPeriodEnd: billing.currentPeriodEnd ?? undefined,
             cancelAtPeriodEnd: false,
             updatedAt: new Date(),
           }).where(eq(subscriptionsTable.userId, userId));
         } else {
           await db.insert(subscriptionsTable).values({
-            userId, plan: billingPlan, status: "active",
-            stripeCustomerId, stripeSubscriptionId,
+            userId, plan: billingPlan, status: billing.status,
+            stripeCustomerId: billing.stripeCustomerId, stripeSubscriptionId: billing.stripeSubscriptionId,
             stripePriceId: PRICE_IDS[billingPlan],
+            billingEmail: email ?? null,
             currentPeriodStart: new Date(),
-            currentPeriodEnd: currentPeriodEnd ?? undefined,
+            currentPeriodEnd: billing.currentPeriodEnd ?? undefined,
           });
         }
 
@@ -247,9 +209,9 @@ router.post("/admin/accounts/:id/approval", async (req, res) => {
       }
     }
 
-    res.json(response);
+    return res.json(response);
   } catch (e: any) {
-    res.status(500).json({ error: e?.message ?? "Failed to update approval status" });
+    return res.status(500).json({ error: e?.message ?? "Failed to update approval status" });
   }
 });
 
@@ -318,9 +280,9 @@ router.post("/accounts", async (req, res) => {
       approvalStatus: "pending",
     }).returning();
 
-    res.status(201).json({ account });
+    return res.status(201).json({ account });
   } catch (e: any) {
-    res.status(500).json({ error: e?.message ?? "Failed to create account" });
+    return res.status(500).json({ error: e?.message ?? "Failed to create account" });
   }
 });
 

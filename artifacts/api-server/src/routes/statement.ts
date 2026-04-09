@@ -153,7 +153,7 @@ router.get("/autopay/statement", async (req, res) => {
     .flatMap(p => p.events.map(e => ({ ...e, bankName: p.bankName })))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  res.json({
+  return res.json({
     month:       fmtMonth(new Date(Date.UTC(year, month - 1, 1))),
     monthKey:    `${year}-${String(month).padStart(2, "0")}`,
     summary: {
@@ -198,7 +198,7 @@ router.post("/autopay/statement/email", async (req, res) => {
   });
 
   const sent = await sendEmail({ to: email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text });
-  res.json({ success: sent, message: sent ? "Statement emailed" : "SMTP not configured — statement not sent" });
+  return res.json({ success: sent, message: sent ? "Statement emailed" : "SMTP not configured — statement not sent" });
 });
 
 export default router;

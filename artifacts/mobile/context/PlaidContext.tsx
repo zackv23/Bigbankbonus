@@ -79,6 +79,11 @@ export function PlaidProvider({ children }: { children: React.ReactNode }) {
     return `http://localhost:8080/api${path}`;
   };
 
+  const getRedirectUri = () => {
+    const domain = process.env.EXPO_PUBLIC_DOMAIN;
+    return domain ? `https://${domain}/plaid-callback` : undefined;
+  };
+
   const getUserId = async () => {
     try {
       const raw = await AsyncStorage.getItem("bbb_user");
@@ -135,7 +140,7 @@ export function PlaidProvider({ children }: { children: React.ReactNode }) {
       const tokenRes = await fetch(getApiUrl("/plaid/link-token"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, redirectUri: getRedirectUri() }),
         signal: linkController.signal,
       });
       clearTimeout(linkTimer);
@@ -192,11 +197,17 @@ export function PlaidProvider({ children }: { children: React.ReactNode }) {
 
       // Real Plaid Link via browser
       const linkToken = tokenData.link_token;
-      const redirectUrl = `https://${process.env.EXPO_PUBLIC_DOMAIN}/plaid-callback`;
+      const redirectUrl = getRedirectUri();
 
       if (Platform.OS === "web") {
         window.location.href = `https://link.plaid.com/?token=${linkToken}`;
         return;
+      }
+
+      if (!redirectUrl) {
+        throw new Error(
+          "Plaid redirect URL is not configured. Set EXPO_PUBLIC_DOMAIN so OAuth-based bank connections can return to the app.",
+        );
       }
 
       const result = await WebBrowser.openAuthSessionAsync(

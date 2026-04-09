@@ -73,7 +73,7 @@ router.get("/profile/score", async (req, res) => {
   if (!userId) return res.status(400).json({ error: "userId required" });
 
   const [profile] = await db.select().from(userProfilesTable).where(eq(userProfilesTable.userId, userId)).limit(1);
-  res.json({ bankScore: profile?.bankScore ?? null, ewsScore: profile?.ewsScore ?? null });
+  return res.json({ bankScore: profile?.bankScore ?? null, ewsScore: profile?.ewsScore ?? null });
 });
 
 router.post("/profile/score", async (req, res) => {
@@ -97,7 +97,7 @@ router.post("/profile/score", async (req, res) => {
     }).returning();
   }
 
-  res.json({ profile });
+  return res.json({ profile });
 });
 
 router.get("/recommendations", async (req, res) => {
@@ -177,7 +177,7 @@ Write a personalized strategy summary explaining why this combination is ideal f
     aiSummary = `With a ${bankScore} bank score and $${totalPlaidBalance.toLocaleString()} in linked funds, you're well-positioned to stack bonuses across personal, business, and credit card accounts. Start with ${stackingCombo.personal?.name ?? "a no-EWS personal account"} to build your history, then layer in the business account and credit card for maximum total earnings of $${stackingCombo.projectedTotal.toLocaleString()}.`;
   }
 
-  res.json({
+  return res.json({
     bankScore,
     totalPlaidBalance,
     aiSummary,

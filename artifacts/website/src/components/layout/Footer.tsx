@@ -3,7 +3,7 @@ import { Link } from "wouter";
 export function Footer() {
   return (
     <footer className="bg-slate-950 pt-20 pb-10 border-t border-white/5 relative overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[1px] bg-gradient-to-r from-transparent via-brand-pink/50 to-transparent"></div>
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[1px] bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent"></div>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
@@ -19,27 +19,27 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-slate-400 max-w-sm">
-              Discover, track, and automate bank bonuses. Our AI does the heavy lifting so you can turn sign-up offers into a reliable side income.
+              Structured software for automated bank bonus execution, deposit planning, and offer monitoring.
             </p>
           </div>
           
           <div>
-            <h4 className="text-white font-bold mb-4">Product</h4>
+            <h4 className="text-white font-bold mb-4">Explore</h4>
             <ul className="space-y-3">
-              <li><button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 hover:text-brand-pink transition-colors">Features</button></li>
-              <li><button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 hover:text-brand-pink transition-colors">Pricing</button></li>
-              <li><button onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 hover:text-brand-pink transition-colors">How it Works</button></li>
-              <li><Link href="/" className="text-slate-400 hover:text-brand-pink transition-colors">Download iOS</Link></li>
-              <li><Link href="/" className="text-slate-400 hover:text-brand-pink transition-colors">Download Android</Link></li>
+              <li><button onClick={() => document.getElementById('problem')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 hover:text-emerald-300 transition-colors">Problem</button></li>
+              <li><button onClick={() => document.getElementById('workflow')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 hover:text-emerald-300 transition-colors">Workflow</button></li>
+              <li><button onClick={() => document.getElementById('solution')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 hover:text-emerald-300 transition-colors">Solution</button></li>
+              <li><button onClick={() => document.getElementById('roadmap')?.scrollIntoView({ behavior: 'smooth' })} className="text-slate-400 hover:text-emerald-300 transition-colors">Future Plans</button></li>
+              <li><Link href="/hub" className="text-slate-400 hover:text-emerald-300 transition-colors">Product Hub</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="text-white font-bold mb-4">Legal</h4>
             <ul className="space-y-3">
-              <li><Link href="/privacy" className="text-slate-400 hover:text-brand-pink transition-colors">Privacy Policy</Link></li>
-              <li><Link href="/terms" className="text-slate-400 hover:text-brand-pink transition-colors">Terms of Service</Link></li>
-              <li><a href="mailto:support@bigbankbonus.com" className="text-slate-400 hover:text-brand-pink transition-colors">Contact Support</a></li>
+              <li><Link href="/privacy" className="text-slate-400 hover:text-emerald-300 transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="text-slate-400 hover:text-emerald-300 transition-colors">Terms of Service</Link></li>
+              <li><a href="mailto:support@bigbankbonus.com" className="text-slate-400 hover:text-emerald-300 transition-colors">Contact Support</a></li>
             </ul>
           </div>
         </div>
@@ -49,7 +49,7 @@ export function Footer() {
             © {new Date().getFullYear()} BigBankBonus. All rights reserved.
           </p>
           <p className="text-slate-600 text-xs text-center md:text-right max-w-md">
-            We are not a financial advisor. Bank bonuses are subject to terms and conditions of the respective financial institutions and are generally considered taxable income.
+            BigBankBonus does not guarantee approvals or bonus payouts. Offers remain subject to each financial institution's terms, conditions, and tax treatment.
           </p>
         </div>
       </div>

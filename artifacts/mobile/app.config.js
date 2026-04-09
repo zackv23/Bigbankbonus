@@ -56,6 +56,13 @@ export default {
       "expo-web-browser",
       "expo-local-authentication",
       "expo-secure-store",
+      [
+        "@stripe/stripe-react-native",
+        {
+          merchantIdentifier: process.env.EXPO_PUBLIC_STRIPE_MERCHANT_IDENTIFIER,
+          enableGooglePay: true,
+        },
+      ],
       ...(isIos ? ["expo-apple-authentication"] : []),
     ],
     experiments: {

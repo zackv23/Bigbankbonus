@@ -17,6 +17,7 @@ import { Router } from "express";
 import { db, autopaySchedulesTable, subscriptionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { sendEmail, sendSMS, sendPushNotification } from "../lib/notifications";
+import { upsertStoredPaymentMethod } from "../lib/stripeBilling";
 
 const router = Router();
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -72,13 +73,43 @@ router.post(
       switch (event.type) {
 
         // ── Subscription events ──────────────────────────────────────────────
+        case "setup_intent.succeeded": {
+          const userId = obj.metadata?.userId as string | undefined;
+          const paymentMethodId = obj.payment_method as string | undefined;
+          const customerId = obj.customer as string | undefined;
+
+          if (userId && paymentMethodId) {
+            await upsertStoredPaymentMethod({
+              userId,
+              email: null,
+              stripeCustomerId: customerId,
+              stripePaymentMethodId: paymentMethodId,
+            });
+          }
+          break;
+        }
+
         case "customer.subscription.updated": {
           const stripeSubId = obj.id as string;
           const status = obj.status as string; // active | past_due | canceled | trialing
-          const planStatus = status === "active" || status === "trialing" ? "active" : "cancelled";
+          const currentPeriodEnd = obj.current_period_end
+            ? new Date((obj.current_period_end as number) * 1000)
+            : undefined;
+          const currentPeriodStart = obj.current_period_start
+            ? new Date((obj.current_period_start as number) * 1000)
+            : undefined;
           await db
             .update(subscriptionsTable)
-            .set({ status: planStatus, updatedAt: new Date() })
+            .set({
+              status,
+              stripePriceId: obj.items?.data?.[0]?.price?.id ?? undefined,
+              stripeDefaultPaymentMethodId:
+                obj.default_payment_method as string | undefined,
+              currentPeriodStart,
+              currentPeriodEnd,
+              cancelAtPeriodEnd: Boolean(obj.cancel_at_period_end),
+              updatedAt: new Date(),
+            })
             .where(eq(subscriptionsTable.stripeSubscriptionId, stripeSubId));
           break;
         }
@@ -117,7 +148,12 @@ router.post(
           if (stripeSubId) {
             await db
               .update(subscriptionsTable)
-              .set({ status: "active", updatedAt: new Date() })
+              .set({
+                status: "active",
+                stripeDefaultPaymentMethodId:
+                  obj.default_payment_method as string | undefined,
+                updatedAt: new Date(),
+              })
               .where(eq(subscriptionsTable.stripeSubscriptionId, stripeSubId));
           }
           break;
@@ -174,7 +210,7 @@ router.post(
       return res.status(500).json({ error: "Internal error" });
     }
 
-    res.json({ received: true });
+    return res.json({ received: true });
   }
 );
 

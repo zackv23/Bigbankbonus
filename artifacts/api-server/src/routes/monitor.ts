@@ -86,9 +86,9 @@ router.get("/monitor/events", async (req, res) => {
       );
     }
 
-    res.json({ events, total: events.length, limit, offset });
+    return res.json({ events, total: events.length, limit, offset });
   } catch (err: any) {
-    res.status(500).json({ error: err.message ?? "Failed to fetch events" });
+    return res.status(500).json({ error: err.message ?? "Failed to fetch events" });
   }
 });
 
@@ -127,12 +127,12 @@ router.get("/monitor/health", async (req, res) => {
     }
 
     const alive = rows.filter(r => r.isAlive).length;
-    res.json({
+    return res.json({
       sources: rows,
       summary: { total: rows.length, alive, dead: rows.length - alive },
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message ?? "Failed to fetch health" });
+    return res.status(500).json({ error: err.message ?? "Failed to fetch health" });
   }
 });
 
@@ -148,9 +148,9 @@ router.get("/monitor/runs", async (req, res) => {
       .from(monitorRunsTable)
       .orderBy(desc(monitorRunsTable.id))
       .limit(limit);
-    res.json({ runs });
+    return res.json({ runs });
   } catch (err: any) {
-    res.status(500).json({ error: err.message ?? "Failed to fetch runs" });
+    return res.status(500).json({ error: err.message ?? "Failed to fetch runs" });
   }
 });
 
@@ -160,7 +160,7 @@ router.post("/monitor/trigger", async (req, res) => {
     return res.status(403).json({ error: "Pro subscription required", upgrade: true });
   }
   const { type = "monitor" } = req.body as { type?: "monitor" | "health" };
-  res.json({ ok: true, message: `${type} job triggered`, triggeredAt: new Date() });
+  return res.json({ ok: true, message: `${type} job triggered`, triggeredAt: new Date() });
   if (type === "health") {
     triggerHealthRun().catch(() => {});
   } else {
@@ -212,7 +212,7 @@ router.get("/monitor/alerts/summary", async (req, res) => {
       return acc;
     }, {} as Record<string, number>);
 
-    res.json({
+    return res.json({
       summary: {
         last24hEvents: last24h.length,
         last7dEvents: allEvents.length,
@@ -223,7 +223,7 @@ router.get("/monitor/alerts/summary", async (req, res) => {
       recentAlerts: allEvents.slice(0, 10),
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message ?? "Failed to fetch alerts summary" });
+    return res.status(500).json({ error: err.message ?? "Failed to fetch alerts summary" });
   }
 });
 

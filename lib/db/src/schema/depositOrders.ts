@@ -25,6 +25,9 @@ export const depositOrdersTable = pgTable("deposit_orders", {
   stripePaymentMethodId: text("stripe_payment_method_id"),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   stripeTransferId: text("stripe_transfer_id"),
+  plaidAuthorizationId: text("plaid_authorization_id"),
+  plaidTransferId: text("plaid_transfer_id"),
+  plaidTransferStatus: text("plaid_transfer_status"),
 
   // Scheduling — ACH goes out the following Monday
   achScheduledDate: timestamp("ach_scheduled_date"),  // next Monday after charge

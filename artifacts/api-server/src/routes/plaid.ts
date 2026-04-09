@@ -8,6 +8,7 @@ const router = Router();
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID;
 const PLAID_SECRET = process.env.PLAID_SECRET;
 const PLAID_ENV = (process.env.PLAID_ENV ?? "sandbox") as "sandbox" | "development" | "production";
+const PLAID_REDIRECT_URI = process.env.PLAID_REDIRECT_URI;
 
 function getPlaidClient(): PlaidApi | null {
   if (!PLAID_CLIENT_ID || !PLAID_SECRET) return null;
@@ -36,6 +37,10 @@ router.post("/plaid/link-token", async (req, res) => {
     });
   }
   const userId = (req.body as any).userId ?? "demo-user";
+  const redirectUri =
+    (req.body as any).redirectUri ??
+    PLAID_REDIRECT_URI ??
+    undefined;
   try {
     const response = await client.linkTokenCreate({
       user: { client_user_id: String(userId) },
@@ -43,11 +48,11 @@ router.post("/plaid/link-token", async (req, res) => {
       products: [Products.Auth, Products.Transactions],
       country_codes: [CountryCode.Us],
       language: "en",
-      redirect_uri: undefined,
+      redirect_uri: redirectUri,
     });
-    res.json({ link_token: response.data.link_token });
+    return res.json({ link_token: response.data.link_token });
   } catch (err: any) {
-    res.status(500).json({ error: err.message ?? "Failed to create link token" });
+    return res.status(500).json({ error: err.message ?? "Failed to create link token" });
   }
 });
 
@@ -142,9 +147,9 @@ router.post("/plaid/exchange-token", async (req, res) => {
         },
       });
 
-    res.json({ success: true, item });
+    return res.json({ success: true, item });
   } catch (err: any) {
-    res.status(500).json({ error: err.message ?? "Token exchange failed" });
+    return res.status(500).json({ error: err.message ?? "Token exchange failed" });
   }
 });
 
@@ -157,7 +162,7 @@ router.get("/plaid/items", async (req, res) => {
     .from(plaidItemsTable)
     .where(eq(plaidItemsTable.userId, userId))
     .orderBy(desc(plaidItemsTable.createdAt));
-  res.json({ items });
+  return res.json({ items });
 });
 
 // GET /plaid/balance?userId=...&itemId=... — get real-time balances
@@ -184,12 +189,12 @@ router.get("/plaid/balance", async (req, res) => {
 
   try {
     const balanceRes = await client.accountsBalanceGet({ access_token: item.accessToken });
-    res.json({
+    return res.json({
       accounts: balanceRes.data.accounts,
       institutionName: item.institutionName,
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -250,9 +255,9 @@ router.get("/plaid/transactions", async (req, res) => {
       end_date: endDate,
       options: { count: 100 },
     });
-    res.json({ transactions: txRes.data.transactions });
+    return res.json({ transactions: txRes.data.transactions });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -281,7 +286,7 @@ router.delete("/plaid/items/:itemId", async (req, res) => {
     .set({ status: "removed" })
     .where(eq(plaidItemsTable.itemId, itemId));
 
-  res.json({ success: true });
+  return res.json({ success: true });
 });
 
 export default router;

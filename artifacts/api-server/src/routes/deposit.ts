@@ -1,6 +1,21 @@
 import { Router } from "express";
-import { db, depositOrdersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import {
+  db,
+  depositOrdersTable,
+  plaidItemsTable,
+  subscriptionsTable,
+} from "@workspace/db";
+import { and, desc, eq } from "drizzle-orm";
+import {
+  PlaidTransferError,
+  authorizePlaidTransfer,
+  createPlaidTransfer,
+  defaultTransferLegalName,
+  formatUsdFromCents,
+  getPlaidTransfer,
+  inferTransferStatus,
+  isPlaidTransferEnabled,
+} from "../lib/plaidTransfer";
 
 const router = Router();
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -190,7 +205,7 @@ router.post("/deposit/initiate", async (req, res) => {
     })
     .returning();
 
-  res.json({
+  return res.json({
     order,
     fees,
     achScheduledDate: achScheduledDate.toISOString(),
@@ -212,9 +227,14 @@ router.get("/deposit/:id/status", async (req, res) => {
     .limit(1);
 
   if (!order) return res.status(404).json({ error: "Deposit not found" });
+  const orderWithPlaid = order as typeof order & {
+    plaidTransferId?: string | null;
+    plaidTransferStatus?: string | null;
+  };
 
   // If live Stripe transfer exists, refresh status
   let stripeTransferStatus: string | null = null;
+  let plaidTransferStatus: string | null = orderWithPlaid.plaidTransferStatus ?? null;
   if (order.stripeTransferId && !order.demo && STRIPE_SECRET) {
     const transfer = await stripeRequest(`/transfers/${order.stripeTransferId}`);
     stripeTransferStatus = transfer?.status ?? null;
@@ -229,10 +249,34 @@ router.get("/deposit/:id/status", async (req, res) => {
     }
   }
 
-  res.json({
+  if (orderWithPlaid.plaidTransferId && !order.demo && isPlaidTransferEnabled()) {
+    try {
+      const transfer = await getPlaidTransfer(orderWithPlaid.plaidTransferId);
+      plaidTransferStatus = inferTransferStatus(transfer);
+
+      await db
+        .update(depositOrdersTable)
+        .set({
+          plaidTransferStatus,
+          status:
+            plaidTransferStatus === "posted"
+              ? "ach_confirmed"
+              : order.status,
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(depositOrdersTable.id, id));
+
+      if (plaidTransferStatus === "posted") {
+        order.status = "ach_confirmed";
+      }
+    } catch {}
+  }
+
+  return res.json({
     id: order.id,
     status: order.status,
     stripeTransferStatus,
+    plaidTransferStatus,
     achScheduledDate: order.achScheduledDate,
     achAmount: order.achAmount,
     depositAmount: order.depositAmount,
@@ -256,7 +300,7 @@ router.get("/deposit", async (req, res) => {
     .from(depositOrdersTable)
     .where(eq(depositOrdersTable.userId, userId));
 
-  res.json({ orders });
+  return res.json({ orders });
 });
 
 // ─── POST /deposit/:id/execute-ach — admin/scheduler trigger ─────────────────
@@ -276,21 +320,111 @@ router.post("/deposit/:id/execute-ach", async (req, res) => {
 
   let transferId = `demo_transfer_${Date.now()}`;
 
-  if (!order.demo && STRIPE_SECRET && order.stripeCustomerId) {
-    // Send $500 via Stripe Transfer to the connected bank account
-    const transfer = await stripeRequest("/transfers", {
-      amount: order.achAmount, // exactly $500 in cents
-      currency: "usd",
-      destination: order.stripeCustomerId,
-      description: `BigBankBonus $500 deposit — Acct ****${order.accountLast4}`,
-      "metadata[depositOrderId]": String(order.id),
-      "metadata[userId]": order.userId,
-    });
-
-    if (transfer?.error) {
-      return res.status(400).json({ error: transfer.error.message });
+  if (!order.demo) {
+    if (!isPlaidTransferEnabled()) {
+      return res.status(503).json({
+        error: "Plaid Transfer is not configured.",
+        detail:
+          "Set PLAID_CLIENT_ID, PLAID_SECRET, and PLAID_ENV, and make sure your Plaid account has Transfer product access enabled.",
+      });
     }
-    transferId = transfer?.id ?? transferId;
+
+    const plaidItems = await db
+      .select()
+      .from(plaidItemsTable)
+      .where(and(eq(plaidItemsTable.userId, order.userId), eq(plaidItemsTable.status, "active")))
+      .orderBy(desc(plaidItemsTable.createdAt));
+
+    let matchedItem:
+      | {
+          accessToken: string;
+          accountId: string;
+        }
+      | undefined;
+
+    for (const item of plaidItems) {
+      const accounts = (item.accounts ?? []) as Array<{
+        account_id?: string;
+        subtype?: string;
+        mask?: string;
+      }>;
+      const account =
+        accounts.find((candidate) => candidate.mask === order.accountLast4) ??
+        accounts.find((candidate) => candidate.subtype === "checking" && candidate.account_id);
+
+      if (item.accessToken && account?.account_id) {
+        matchedItem = {
+          accessToken: item.accessToken,
+          accountId: account.account_id,
+        };
+        if (account.mask === order.accountLast4) break;
+      }
+    }
+
+    if (!matchedItem) {
+      return res.status(400).json({
+        error: "No Plaid-linked destination account is available for this deposit.",
+        detail:
+          "Link the destination bank account with Plaid first. The linked account should match the target account's last 4 digits so ACH can be automated safely.",
+      });
+    }
+
+    const [subscription] = await db
+      .select()
+      .from(subscriptionsTable)
+      .where(eq(subscriptionsTable.userId, order.userId))
+      .limit(1);
+
+    try {
+      const authorization = await authorizePlaidTransfer({
+        accessToken: matchedItem.accessToken,
+        accountId: matchedItem.accountId,
+        amount: formatUsdFromCents(order.achAmount),
+        type: "credit",
+        legalName: defaultTransferLegalName(order.userId),
+        emailAddress: subscription?.billingEmail ?? undefined,
+        userId: order.userId,
+      });
+
+      const transfer = await createPlaidTransfer({
+        accessToken: matchedItem.accessToken,
+        accountId: matchedItem.accountId,
+        authorizationId: authorization.id,
+        amount: formatUsdFromCents(order.achAmount),
+        type: "credit",
+        description: `BBB deposit ${order.accountLast4}`,
+        userId: order.userId,
+      });
+
+      await db
+        .update(depositOrdersTable)
+        .set({
+          status: "ach_sent",
+          plaidAuthorizationId: authorization.id,
+          plaidTransferId: transfer.id,
+          plaidTransferStatus: inferTransferStatus(transfer),
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(depositOrdersTable.id, id));
+
+      return res.json({
+        success: true,
+        transferId: transfer.id,
+        provider: "plaid_transfer",
+        status: "ach_sent",
+        plaidTransferStatus: inferTransferStatus(transfer),
+      });
+    } catch (error) {
+      const message =
+        error instanceof PlaidTransferError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Failed to create Plaid Transfer ACH credit.";
+      return res.status(error instanceof PlaidTransferError ? error.statusCode ?? 500 : 500).json({
+        error: message,
+      });
+    }
   }
 
   await db
@@ -298,7 +432,7 @@ router.post("/deposit/:id/execute-ach", async (req, res) => {
     .set({ status: "ach_sent", stripeTransferId: transferId, updatedAt: new Date() })
     .where(eq(depositOrdersTable.id, id));
 
-  res.json({ success: true, transferId, status: "ach_sent" });
+  return res.json({ success: true, transferId, status: "ach_sent" });
 });
 
 export default router;

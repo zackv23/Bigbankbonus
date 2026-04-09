@@ -185,7 +185,7 @@ router.post("/autopay/create", async (req, res) => {
     })
     .returning();
 
-  res.json({
+  return res.json({
     schedule,
     ddAmount, chargeAmount, achAmount, ddOutDate, ddInDate, refundDate,
     plaidLinked: !!(plaidAccessToken && plaidAccountId),
@@ -203,7 +203,7 @@ router.get("/autopay", async (req, res) => {
     .where(eq(autopaySchedulesTable.userId, userId))
     .orderBy(desc(autopaySchedulesTable.createdAt));
 
-  res.json({ schedules });
+  return res.json({ schedules });
 });
 
 // ─── DELETE /autopay/:id ──────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ router.delete("/autopay/:id", async (req, res) => {
     .set({ status: "cancelled", updatedAt: new Date() })
     .where(eq(autopaySchedulesTable.id, id));
 
-  res.json({ success: true });
+  return res.json({ success: true });
 });
 
 // ─── POST /autopay/:id/execute-push — trigger ACH push (admin/webhook) ────────
@@ -270,7 +270,7 @@ router.post("/autopay/:id/execute-push", async (req, res) => {
     .set({ status: "ach_push_sent", stripeTransferOutId: transferOutId, updatedAt: new Date() })
     .where(eq(autopaySchedulesTable.id, id));
 
-  res.json({ success: true, transferOutId });
+  return res.json({ success: true, transferOutId });
 });
 
 // ─── PATCH /autopay/notify-prefs — sync email/phone/pushToken to active schedules
@@ -301,7 +301,7 @@ router.patch("/autopay/notify-prefs", async (req, res) => {
       ),
     );
 
-  res.json({ success: true });
+  return res.json({ success: true });
 });
 
 // ─── PATCH /autopay/link-plaid — attach Plaid to all active schedules for user
@@ -349,7 +349,7 @@ router.patch("/autopay/link-plaid", async (req, res) => {
       ),
     );
 
-  res.json({
+  return res.json({
     success: true,
     institutionName: item.institutionName,
     accountMask: checking?.mask ?? "???",
@@ -391,7 +391,7 @@ router.get("/autopay/amounts", (req, res) => {
   const ddOutDate = nextBusinessDay(now);
   const ddInDate = addBusinessDays(ddOutDate, 5);
   const refundDate = addBusinessDays(ddInDate, 3);
-  res.json({ ...amounts, ddOutDate, ddInDate, refundDate });
+  return res.json({ ...amounts, ddOutDate, ddInDate, refundDate });
 });
 
 export default router;

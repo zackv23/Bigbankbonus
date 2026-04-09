@@ -1,30 +1,19 @@
 import { Router } from "express";
 import { db, subscriptionsTable, userAccountsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import {
+  PRICE_IDS,
+  SERVICE_FEE,
+  activateApprovedSubscription,
+  cancelStripeSubscription,
+  createSubscriptionSetupIntent,
+} from "../lib/stripeBilling";
 
 const router = Router();
-const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
 
 // Updated pricing: $6/mo subscription + $99 one-time service fee, triggered on approval
-const MONTHLY_PRICE = 6.00;
-const ANNUAL_PRICE = 72.00;
-const SERVICE_FEE = 99.00;
-
-const PRICE_IDS = {
-  monthly: process.env.STRIPE_PRICE_MONTHLY ?? "price_monthly_demo",
-  annual:  process.env.STRIPE_PRICE_ANNUAL  ?? "price_annual_demo",
-  serviceFee: process.env.STRIPE_PRICE_SERVICE_FEE ?? "price_service_fee_demo",
-};
-
-async function stripePost(path: string, body: Record<string, string>): Promise<Record<string, any>> {
-  if (!STRIPE_SECRET) return { demo: true };
-  const res = await fetch(`https://api.stripe.com/v1${path}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${STRIPE_SECRET}`, "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(body),
-  });
-  return res.json() as Promise<Record<string, any>>;
-}
+const MONTHLY_PRICE = 6.0;
+const ANNUAL_PRICE = 72.0;
 
 // ─── GET /subscriptions/prices — public pricing (MUST be before /:userId) ──
 router.get("/subscriptions/prices", (_req, res) => {
@@ -39,7 +28,7 @@ router.get("/subscriptions/prices", (_req, res) => {
     annual: {
       price: ANNUAL_PRICE,
       interval: "year",
-      monthlyEquivalent: 6.00,
+      monthlyEquivalent: 6.0,
       label: "Pro Annual",
       priceId: PRICE_IDS.annual,
       note: "Charged after account approval",
@@ -50,8 +39,65 @@ router.get("/subscriptions/prices", (_req, res) => {
       description: "Charged once when your bank account is approved",
     },
     billingModel: "approval_gated",
-    billingExplanation: "Sign up is free. You are only charged the $6/mo subscription and the $99 service fee after your bank account application is approved.",
+    billingExplanation:
+      "Sign up is free. You are only charged the $6/mo subscription and the $99 service fee after your bank account application is approved.",
   });
+});
+
+router.post("/subscriptions/setup", async (req, res) => {
+  const { userId, email } = req.body as {
+    userId?: string;
+    email?: string;
+  };
+
+  if (!userId) {
+    return res.status(400).json({ error: "userId required" });
+  }
+
+  try {
+    const [existingSub] = await db
+      .select()
+      .from(subscriptionsTable)
+      .where(eq(subscriptionsTable.userId, userId))
+      .limit(1);
+
+    const setup = await createSubscriptionSetupIntent({
+      userId,
+      email: email ?? existingSub?.billingEmail ?? undefined,
+      existingCustomerId: existingSub?.stripeCustomerId,
+    });
+
+    if (existingSub) {
+      await db
+        .update(subscriptionsTable)
+        .set({
+          stripeCustomerId: setup.customerId,
+          billingEmail: email ?? existingSub.billingEmail,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptionsTable.userId, userId));
+    } else {
+      await db.insert(subscriptionsTable).values({
+        userId,
+        plan: "free",
+        status: "active",
+        stripeCustomerId: setup.customerId,
+        billingEmail: email ?? null,
+      });
+    }
+
+    return res.json({
+      ...setup,
+      publishableKey:
+        process.env.STRIPE_PUBLISHABLE_KEY ??
+        process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ??
+        null,
+    });
+  } catch (error: any) {
+    return res.status(error?.statusCode ?? 500).json({
+      error: error?.message ?? "Failed to initialize subscription setup",
+    });
+  }
 });
 
 // ─── GET /subscriptions/:userId ───────────────────────────────────────────────
@@ -65,13 +111,15 @@ router.get("/subscriptions/:userId", async (req, res) => {
 
   if (!sub) {
     return res.json({
-      plan: "free", status: "active", userId,
+      plan: "free",
+      status: "active",
+      userId,
       billingActive: false,
       features: planFeatures("free"),
     });
   }
 
-  res.json({ ...sub, features: planFeatures(sub.plan) });
+  return res.json({ ...sub, features: planFeatures(sub.plan) });
 });
 
 /**
@@ -92,28 +140,31 @@ router.post("/subscriptions/subscribe", async (req, res) => {
     return res.status(400).json({ error: "userId and plan required" });
   }
 
-  // ─── Approval gate: ensure user has an approved account ─────────────────
   const approvedAccounts = await db
     .select()
     .from(userAccountsTable)
     .where(eq(userAccountsTable.userId, userId));
 
-  const hasApproved = approvedAccounts.some(a => a.approvalStatus === "approved");
+  const hasApproved = approvedAccounts.some((a) => a.approvalStatus === "approved");
   if (!hasApproved) {
     return res.status(403).json({
       error: "Billing cannot be activated before account approval",
-      detail: "At least one user account must be in 'approved' status before a subscription can be created.",
+      detail:
+        "At least one user account must be in 'approved' status before a subscription can be created.",
     });
   }
 
-  // ─── Idempotency: avoid double-charging ────────────────────────────────
   const [existingSub] = await db
     .select()
     .from(subscriptionsTable)
     .where(eq(subscriptionsTable.userId, userId))
     .limit(1);
 
-  if (existingSub && (existingSub.plan === "monthly" || existingSub.plan === "annual") && existingSub.status === "active") {
+  if (
+    existingSub &&
+    (existingSub.plan === "monthly" || existingSub.plan === "annual") &&
+    existingSub.status === "active"
+  ) {
     return res.status(409).json({
       error: "Active subscription already exists",
       subscription: existingSub,
@@ -121,78 +172,66 @@ router.post("/subscriptions/subscribe", async (req, res) => {
     });
   }
 
-  const isDemo = !STRIPE_SECRET || stripePaymentMethodId === "demo";
-  let stripeCustomerId: string | null = null;
-  let stripeSubscriptionId: string | null = null;
-  let currentPeriodEnd: Date | null = null;
-
-  if (!isDemo && stripePaymentMethodId && email) {
-    const customer = await stripePost("/customers", {
-      email,
-      "metadata[userId]": userId,
-    });
-    stripeCustomerId = customer.id;
-
-    await stripePost(`/payment_methods/${stripePaymentMethodId}/attach`, {
-      customer: stripeCustomerId,
+  try {
+    const billing = await activateApprovedSubscription({
+      userId,
+      plan,
+      email: email ?? existingSub?.billingEmail ?? undefined,
+      existingCustomerId: existingSub?.stripeCustomerId,
+      defaultPaymentMethodId:
+        stripePaymentMethodId ??
+        existingSub?.stripeDefaultPaymentMethodId ??
+        undefined,
     });
 
-    await stripePost(`/customers/${stripeCustomerId}`, {
-      "invoice_settings[default_payment_method]": stripePaymentMethodId,
-    });
-
-    // Create $6/mo subscription
-    const priceId = PRICE_IDS[plan];
-    const subscription = await stripePost("/subscriptions", {
-      customer: stripeCustomerId,
-      "items[0][price]": priceId,
-      "expand[]": "latest_invoice.payment_intent",
-    });
-    stripeSubscriptionId = subscription.id;
-    if (subscription.current_period_end) {
-      currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+    let sub;
+    if (existingSub) {
+      [sub] = await db
+        .update(subscriptionsTable)
+        .set({
+          plan,
+          status: billing.status,
+          stripeCustomerId: billing.stripeCustomerId,
+          stripeSubscriptionId: billing.stripeSubscriptionId,
+          stripePriceId: billing.stripePriceId,
+          stripeDefaultPaymentMethodId:
+            stripePaymentMethodId ?? existingSub.stripeDefaultPaymentMethodId ?? undefined,
+          billingEmail: email ?? existingSub.billingEmail ?? undefined,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: billing.currentPeriodEnd ?? undefined,
+          cancelAtPeriodEnd: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptionsTable.userId, userId))
+        .returning();
+    } else {
+      [sub] = await db
+        .insert(subscriptionsTable)
+        .values({
+          userId,
+          plan,
+          status: billing.status,
+          stripeCustomerId: billing.stripeCustomerId,
+          stripeSubscriptionId: billing.stripeSubscriptionId,
+          stripePriceId: billing.stripePriceId,
+          stripeDefaultPaymentMethodId: stripePaymentMethodId ?? null,
+          billingEmail: email ?? null,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: billing.currentPeriodEnd ?? undefined,
+        })
+        .returning();
     }
 
-    // Charge the $99 one-time service fee as a separate invoice
-    await stripePost("/invoiceitems", {
-      customer: stripeCustomerId,
-      amount: String(Math.round(SERVICE_FEE * 100)),
-      currency: "usd",
-      description: "BigBankBonus One-Time Service Fee",
+    return res.json({
+      subscription: sub,
+      features: planFeatures(plan),
+      serviceFeeCharged: true,
     });
-    await stripePost("/invoices", {
-      customer: stripeCustomerId,
-      auto_advance: "true",
+  } catch (error: any) {
+    return res.status(error?.statusCode ?? 500).json({
+      error: error?.message ?? "Failed to create subscription",
     });
-  } else {
-    // Demo mode — no real Stripe calls
-    stripeCustomerId = `demo_cus_${userId}`;
-    stripeSubscriptionId = `demo_sub_${Date.now()}`;
-    currentPeriodEnd = new Date(Date.now() + (plan === "annual" ? 365 : 30) * 24 * 60 * 60 * 1000);
   }
-
-  let sub;
-  if (existingSub) {
-    [sub] = await db.update(subscriptionsTable).set({
-      plan, status: "active",
-      stripeCustomerId, stripeSubscriptionId,
-      stripePriceId: PRICE_IDS[plan],
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: currentPeriodEnd ?? undefined,
-      cancelAtPeriodEnd: false,
-      updatedAt: new Date(),
-    }).where(eq(subscriptionsTable.userId, userId)).returning();
-  } else {
-    [sub] = await db.insert(subscriptionsTable).values({
-      userId, plan, status: "active",
-      stripeCustomerId, stripeSubscriptionId,
-      stripePriceId: PRICE_IDS[plan],
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: currentPeriodEnd ?? undefined,
-    }).returning();
-  }
-
-  res.json({ subscription: sub, features: planFeatures(plan), serviceFeeCharged: true });
 });
 
 // ─── POST /subscriptions/cancel ──────────────────────────────────────────────
@@ -200,21 +239,24 @@ router.post("/subscriptions/cancel", async (req, res) => {
   const { userId } = req.body as { userId: string };
   if (!userId) return res.status(400).json({ error: "userId required" });
 
-  const [sub] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, userId)).limit(1);
+  const [sub] = await db
+    .select()
+    .from(subscriptionsTable)
+    .where(eq(subscriptionsTable.userId, userId))
+    .limit(1);
   if (!sub) return res.status(404).json({ error: "No subscription found" });
 
-  if (STRIPE_SECRET && sub.stripeSubscriptionId && !sub.stripeSubscriptionId.startsWith("demo_")) {
-    await stripePost(`/subscriptions/${sub.stripeSubscriptionId}`, {
-      cancel_at_period_end: "true",
-    });
+  if (sub.stripeSubscriptionId && !sub.stripeSubscriptionId.startsWith("demo_")) {
+    await cancelStripeSubscription(sub.stripeSubscriptionId);
   }
 
-  const [updated] = await db.update(subscriptionsTable)
+  const [updated] = await db
+    .update(subscriptionsTable)
     .set({ cancelAtPeriodEnd: true, updatedAt: new Date() })
     .where(eq(subscriptionsTable.userId, userId))
     .returning();
 
-  res.json({ subscription: updated });
+  return res.json({ subscription: updated });
 });
 
 // ─── Feature gates ────────────────────────────────────────────────────────────

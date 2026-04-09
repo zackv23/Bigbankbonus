@@ -41,14 +41,14 @@ router.post("/api/agent/chat", async (req, res) => {
       }
     }
 
-    res.end();
+    return res.end();
   } catch (err: any) {
     console.error("Agent error:", err);
     if (!res.headersSent) {
-      res.status(500).json({ error: "Agent service error", message: err.message });
+      return res.status(500).json({ error: "Agent service error", message: err.message });
     } else {
       res.write(`data: ${JSON.stringify({ error: "Stream error" })}\n\n`);
-      res.end();
+      return res.end();
     }
   }
 });
