@@ -26,3 +26,4 @@ export * from "./monitor";
 export * from "./fileUploads";
 export * from "./userProfiles";
 export * from "./depositOrders";
+export * from "./salesReps";
