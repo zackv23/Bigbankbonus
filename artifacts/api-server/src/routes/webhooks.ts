@@ -31,7 +31,7 @@ async function verifyStripeSignature(
 ): Promise<boolean> {
   if (!signature) return false;
   try {
-    const { createHmac } = await import("crypto");
+    const { createHmac, timingSafeEqual } = await import("crypto");
     const parts = signature.split(",").reduce<Record<string, string>>((acc, part) => {
       const [k, v] = part.split("=");
       acc[k] = v;
@@ -42,7 +42,8 @@ async function verifyStripeSignature(
     if (!timestamp || !expected) return false;
     const payload = `${timestamp}.${rawBody.toString("utf8")}`;
     const hmac = createHmac("sha256", secret).update(payload).digest("hex");
-    return hmac === expected;
+    if (hmac.length !== expected.length) return false;
+    return timingSafeEqual(Buffer.from(hmac), Buffer.from(expected));
   } catch {
     return false;
   }

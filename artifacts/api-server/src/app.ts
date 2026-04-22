@@ -62,15 +62,17 @@ const globalLimiter = rateLimit({
   skip: () => !isProd, // only enforce in production
 });
 
-// Strict: auth + payment endpoints — 10 req/min per IP
-const strictLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  standardHeaders: "draft-7",
-  legacyHeaders: false,
-  message: { error: "Too many requests on this endpoint, please try again later." },
-  skip: () => !isProd,
-});
+// Strict: auth + payment endpoints — 10 req/min per IP (independent per path)
+function createStrictLimiter() {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { error: "Too many requests on this endpoint, please try again later." },
+    skip: () => !isProd,
+  });
+}
 
 app.use(globalLimiter);
 app.use(
@@ -95,11 +97,11 @@ app.use(
 app.use(express.json({ verify: captureRawBody }));
 app.use(express.urlencoded({ extended: true }));
 
-// Apply strict rate limit to sensitive endpoints
-app.use("/api/auth", strictLimiter);
-app.use("/api/subscriptions/subscribe", strictLimiter);
-app.use("/api/deposit/initiate", strictLimiter);
-app.use("/api/autopay/create", strictLimiter);
+// Apply strict rate limit to sensitive endpoints (each gets its own instance)
+app.use("/api/auth", createStrictLimiter());
+app.use("/api/subscriptions/subscribe", createStrictLimiter());
+app.use("/api/deposit/initiate", createStrictLimiter());
+app.use("/api/autopay/create", createStrictLimiter());
 
 app.use("/api", router);
 
