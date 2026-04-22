@@ -80,6 +80,24 @@ Every package extends `tsconfig.base.json` (`composite: true`). Always typecheck
 - EWS & ChexSystems Monitor — 1,004+ endpoints checked every 6 hours
 - Command Hub — Plaid card, ChexSystems report, file upload center
 
+## Deployment
+
+### Website — IONOS Deploy Now
+- **Platform**: IONOS Deploy Now (static hosting, Apache)
+- **Config**: `.ionos/config.yaml` — build command, output dir
+- **Output dir**: `artifacts/website/dist/public`
+- **Build command** (CI): `corepack enable && pnpm install --frozen-lockfile && pnpm --filter @workspace/website... run build`
+- **SPA routing**: `artifacts/website/public/.htaccess` (Vite copies to dist) — rewrites all paths to `index.html`
+- **ENV vars**: `PORT` and `BASE_PATH` are only required for `dev`/`preview`, not `build`
+- **Domain**: bigbankbonus.com + www — bind in IONOS Deploy Now Domains tab
+- **API proxy**: `/api/*` must be reverse-proxied to the API server host; Deploy Now static cannot serve it
+
+### Website build (local)
+```bash
+pnpm --filter @workspace/website... run build
+# outputs to artifacts/website/dist/public/
+```
+
 ## Version History
 
 - **v1.0-stable** (2026-04-01) — V1 baseline before V2.0 upgrade

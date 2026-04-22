@@ -590,7 +590,7 @@ export default function AccountsScreen() {
           <Feather name="credit-card" size={48} color={c.textTertiary} />
           <Text style={[styles.emptyTitle, { color: c.textSecondary }]}>No tracked bonuses</Text>
           <Text style={[styles.emptySubtitle, { color: c.textTertiary }]}>Find banks in Discover and add them to start tracking bonuses</Text>
-          <Pressable style={styles.emptyBtn} onPress={() => router.push("/(tabs)/")}>
+          <Pressable style={styles.emptyBtn} onPress={() => router.push("/")}>
             <LinearGradient colors={["#833AB4", "#E1306C"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.emptyBtnGrad}>
               <Feather name="search" size={16} color="#fff" />
               <Text style={styles.emptyBtnText}>Discover Banks</Text>

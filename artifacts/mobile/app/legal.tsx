@@ -32,11 +32,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function P({ children }: { children: React.ReactNode }) {
+function P({ children, style }: { children: React.ReactNode; style?: import("react-native").TextStyle }) {
   const colorScheme = useColorScheme();
   const c = colorScheme === "dark" ? Colors.dark : Colors.light;
   return (
-    <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: c.textSecondary, lineHeight: 20, marginBottom: 8 }}>
+    <Text style={[{ fontSize: 13, fontFamily: "Inter_400Regular", color: c.textSecondary, lineHeight: 20, marginBottom: 8 }, style]}>
       {children}
     </Text>
   );
