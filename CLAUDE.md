@@ -91,6 +91,7 @@ Every package extends `tsconfig.base.json` (`composite: true`). Always typecheck
 - **ENV vars**: `PORT` and `BASE_PATH` are only required for `dev`/`preview`, not `build`
 - **Domain**: bigbankbonus.com + www — bind in IONOS Deploy Now Domains tab
 - **API proxy**: `/api/*` must be reverse-proxied to the API server host; Deploy Now static cannot serve it
+- **Trust proxy**: The API server sets `trust proxy = 1` (one proxy hop). If there are multiple proxy layers (e.g. CDN → LB → app), increase the value to match the number of trusted hops so `req.ip` resolves to the real client IP for rate limiting and logging.
 
 ### Website build (local)
 ```bash

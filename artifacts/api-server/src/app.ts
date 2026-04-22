@@ -20,6 +20,10 @@ const ALLOWED_ORIGINS = [
 
 const app: Express = express();
 
+// Trust the first reverse proxy hop so req.ip resolves to the real client IP.
+// Required for rate limiting to key per-user instead of per-proxy.
+app.set("trust proxy", 1);
+
 const captureRawBody = (
   req: express.Request & { rawBody?: Buffer },
   _res: express.Response,
