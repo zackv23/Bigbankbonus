@@ -1,0 +1,9 @@
+node_modules
+dist
+*.tsbuildinfo
+artifacts/api-server
+artifacts/mobile
+artifacts/mockup-sandbox
+attached_assets
+app-store-submission
+scripts
