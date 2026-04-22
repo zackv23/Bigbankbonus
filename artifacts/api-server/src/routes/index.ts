@@ -13,6 +13,8 @@ import recommendationsRouter from "./recommendations";
 import depositRouter from "./deposit";
 import webhooksRouter from "./webhooks";
 import statementRouter from "./statement";
+import salesRouter from "./sales";
+import ownerRouter from "./owner";
 
 const router: IRouter = Router();
 
@@ -30,5 +32,7 @@ router.use(recommendationsRouter);
 router.use(depositRouter);
 router.use(webhooksRouter);
 router.use(statementRouter);
+router.use(salesRouter);
+router.use(ownerRouter);
 
 export default router;

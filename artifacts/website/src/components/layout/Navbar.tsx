@@ -45,23 +45,19 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-6">
             <button onClick={() => scrollTo("problem")} className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">Problem</button>
             <button onClick={() => scrollTo("workflow")} className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">Workflow</button>
             <button onClick={() => scrollTo("solution")} className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">Solution</button>
-            <button onClick={() => scrollTo("roadmap")} className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">Roadmap</button>
             <button onClick={() => scrollTo("faq")} className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">FAQ</button>
+            <Link href="/dashboard" className="text-sm font-medium text-emerald-800 hover:text-emerald-950 transition-colors">Client</Link>
+            <Link href="/sales" className="text-sm font-medium text-indigo-700 hover:text-indigo-950 transition-colors">Sales</Link>
+            <Link href="/owner" className="text-sm font-medium text-slate-700 hover:text-slate-950 transition-colors">Owner</Link>
             <Link
-              href="/hub"
-              className="text-sm font-medium text-emerald-800 hover:text-emerald-950 transition-colors"
-            >
-              Product Hub
-            </Link>
-            <Link 
-              href="/hub" 
+              href="/dashboard"
               className="bg-slate-950 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:-translate-y-0.5 transition-all duration-300"
             >
-              Preview Platform
+              Get Started
             </Link>
           </div>
 
@@ -88,19 +84,16 @@ export function Navbar() {
               <button onClick={() => scrollTo("problem")} className="text-left text-lg font-medium text-slate-900 py-2">Problem</button>
               <button onClick={() => scrollTo("workflow")} className="text-left text-lg font-medium text-slate-900 py-2">Workflow</button>
               <button onClick={() => scrollTo("solution")} className="text-left text-lg font-medium text-slate-900 py-2">Solution</button>
-              <button onClick={() => scrollTo("roadmap")} className="text-left text-lg font-medium text-slate-900 py-2">Roadmap</button>
               <button onClick={() => scrollTo("faq")} className="text-left text-lg font-medium text-slate-900 py-2">FAQ</button>
+              <Link href="/dashboard" className="text-left text-lg font-medium text-emerald-800 py-2">Client Dashboard</Link>
+              <Link href="/sales" className="text-left text-lg font-medium text-indigo-700 py-2">Sales Portal</Link>
+              <Link href="/owner" className="text-left text-lg font-medium text-slate-700 py-2">Owner Dashboard</Link>
+              <Link href="/hub" className="text-left text-lg font-medium text-slate-600 py-2">Command Hub</Link>
               <Link
-                href="/hub"
-                className="text-left text-lg font-medium text-emerald-800 py-2"
-              >
-                Product Hub
-              </Link>
-              <Link 
-                href="/hub" 
+                href="/dashboard"
                 className="bg-slate-950 text-white text-center px-5 py-3 mt-4 rounded-xl text-base font-bold"
               >
-                Preview Platform
+                Get Started
               </Link>
             </div>
           </motion.div>
