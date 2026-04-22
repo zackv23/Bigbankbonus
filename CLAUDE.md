@@ -99,6 +99,19 @@ pnpm --filter @workspace/website... run build
 # outputs to artifacts/website/dist/public/
 ```
 
+## Security
+
+### Rate limiting (`artifacts/api-server/src/app.ts`)
+- **Global**: 200 req/min per IP (all routes). Skipped outside production.
+- **Strict**: 10 req/min per IP on `/api/auth`, `/api/subscriptions/subscribe`, `/api/deposit/initiate`, `/api/autopay/create`. Each path gets its own independent `rateLimit()` instance via `createStrictLimiter()` factory — counters are **not** shared across endpoints.
+- **Helmet**: Security headers enabled. `crossOriginEmbedderPolicy` disabled for Stripe.js iframes. CSP disabled in dev.
+- **CORS**: Strict origin whitelist (`bigbankbonus.com`, `www.bigbankbonus.com`, localhost in dev). Null-origin requests allowed for mobile native, webhooks, and curl.
+
+### Stripe webhook verification (`artifacts/api-server/src/routes/webhooks.ts`)
+- Lightweight HMAC-SHA256 verification of `Stripe-Signature` header against `STRIPE_WEBHOOK_SECRET`.
+- Uses `crypto.timingSafeEqual()` for constant-time comparison to prevent timing side-channel attacks.
+- Falls back to unverified in dev/demo mode when `STRIPE_WEBHOOK_SECRET` is not set.
+
 ## Version History
 
 - **v1.0-stable** (2026-04-01) — V1 baseline before V2.0 upgrade
