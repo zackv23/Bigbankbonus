@@ -4,7 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-const isServing = process.argv.some((a) => a === "dev" || a === "serve" || a === "preview");
+const isBuilding = process.argv.some((a) => a === "build");
+const isServing = !isBuilding;
 
 const rawPort = process.env.PORT;
 
