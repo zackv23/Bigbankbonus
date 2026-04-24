@@ -374,7 +374,7 @@ export function PersonalizedStrategy() {
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-brand-purple to-brand-pink text-white font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
               >
                 <Zap className="w-4 h-4" />
-                Unlock Full AI Strategy — $6.99/mo
+                Unlock Full AI Strategy — $49 onboarding
               </a>
             </div>
           </motion.div>

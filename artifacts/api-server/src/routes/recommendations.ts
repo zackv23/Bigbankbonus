@@ -105,7 +105,10 @@ router.get("/recommendations", async (req, res) => {
   if (!userId) return res.status(400).json({ error: "userId required" });
 
   const [sub] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, userId)).limit(1);
-  const isPaid = sub && (sub.plan === "monthly" || sub.plan === "annual") && sub.status === "active";
+  const isPaid =
+    sub &&
+    (sub.plan === "monthly" || sub.plan === "annual" || sub.plan === "onboarding") &&
+    sub.status === "active";
 
   if (!isPaid) {
     return res.status(403).json({ error: "Pro subscription required", code: "NOT_SUBSCRIBED" });
@@ -113,6 +116,7 @@ router.get("/recommendations", async (req, res) => {
 
   const [profile] = await db.select().from(userProfilesTable).where(eq(userProfilesTable.userId, userId)).limit(1);
   const bankScore = profile?.bankScore ?? 0;
+  const ewsScore = profile?.ewsScore ?? null;
 
   if (bankScore < 700) {
     return res.status(403).json({ error: "Bank score of 700+ required", code: "SCORE_TOO_LOW", bankScore });
@@ -177,9 +181,72 @@ Write a personalized strategy summary explaining why this combination is ideal f
     aiSummary = `With a ${bankScore} bank score and $${totalPlaidBalance.toLocaleString()} in linked funds, you're well-positioned to stack bonuses across personal, business, and credit card accounts. Start with ${stackingCombo.personal?.name ?? "a no-EWS personal account"} to build your history, then layer in the business account and credit card for maximum total earnings of $${stackingCombo.projectedTotal.toLocaleString()}.`;
   }
 
+  const scoreCards = [
+    {
+      label: "Bank Score",
+      value: bankScore,
+      tier: bankScore >= 750 ? "Excellent" : bankScore >= 700 ? "Good" : "Needs Improvement",
+      guidance:
+        bankScore >= 700
+          ? "Your score is strong enough to qualify for higher-value offers."
+          : "Link more accounts and improve deposit history to reach 700+.",
+    },
+    {
+      label: "Linked Balance",
+      value: totalPlaidBalance,
+      tier: totalPlaidBalance >= 5000 ? "Healthy" : "Limited",
+      guidance:
+        totalPlaidBalance >= 5000
+          ? "You have enough liquidity for most direct-deposit bonus triggers."
+          : "Consider funding an account to meet higher bonus requirements.",
+    },
+    {
+      label: "EWS Score",
+      value: ewsScore ?? "Unknown",
+      tier:
+        ewsScore === null
+          ? "Not available"
+          : ewsScore >= 80
+          ? "Strong"
+          : ewsScore >= 60
+          ? "Moderate"
+          : "Needs attention",
+      guidance:
+        ewsScore === null
+          ? "Link accounts or update your profile to evaluate EWS risk."
+          : ewsScore >= 80
+          ? "Your EWS risk is low for most checking account offers."
+          : "Focus on no-EWS accounts to reduce eligibility risk.",
+    },
+  ];
+
+  const offerCategories = [
+    {
+      key: "personal",
+      name: "Personal Banking",
+      headline: personalOffers[0]?.name ?? "Top personal bonus",
+      count: personalOffers.length,
+    },
+    {
+      key: "business",
+      name: "Business Banking",
+      headline: businessOffers[0]?.name ?? "Top business bonus",
+      count: businessOffers.length,
+    },
+    {
+      key: "credit_card",
+      name: "Rewards Cards",
+      headline: creditCardOffers[0]?.name ?? "Top card bonus",
+      count: creditCardOffers.length,
+    },
+  ];
+
   return res.json({
+    subscriptionPlan: sub?.plan ?? "free",
     bankScore,
     totalPlaidBalance,
+    scoreCards,
+    offerCategories,
     aiSummary,
     stackingCombo: {
       ...stackingCombo,

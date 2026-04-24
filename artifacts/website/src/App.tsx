@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { lazy, Suspense } from "react";
 import Home from "@/pages/Home";
+import ComingSoon from "@/pages/ComingSoon";
 import NotFound from "@/pages/not-found";
 
 const HubPage = lazy(() => import("@/pages/Hub"));
@@ -34,6 +35,7 @@ function Router() {
   return (
     <Suspense fallback={<LazyFallback />}>
       <Switch>
+        <Route path="/coming-soon" component={ComingSoon} />
         <Route path="/" component={Home} />
         <Route path="/hub" component={HubPage} />
         <Route path="/dashboard" component={ClientDashboard} />

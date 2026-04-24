@@ -4,9 +4,12 @@ import { eq } from "drizzle-orm";
 import {
   PRICE_IDS,
   SERVICE_FEE,
+  ONBOARDING_FEE,
   activateApprovedSubscription,
   cancelStripeSubscription,
+  createOneTimeCharge,
   createSubscriptionSetupIntent,
+  ensureStripeCustomer,
 } from "../lib/stripeBilling";
 
 const router = Router();
@@ -32,6 +35,13 @@ router.get("/subscriptions/prices", (_req, res) => {
       label: "Pro Annual",
       priceId: PRICE_IDS.annual,
       note: "Charged after account approval",
+    },
+    onboarding: {
+      price: ONBOARDING_FEE,
+      interval: "one-time",
+      label: "Onboarding Access",
+      priceId: PRICE_IDS.onboarding,
+      description: "One-time onboarding fee that unlocks 6 months of live bonus and automation access.",
     },
     serviceFee: {
       price: SERVICE_FEE,
@@ -96,6 +106,120 @@ router.post("/subscriptions/setup", async (req, res) => {
   } catch (error: any) {
     return res.status(error?.statusCode ?? 500).json({
       error: error?.message ?? "Failed to initialize subscription setup",
+    });
+  }
+});
+
+router.post("/subscriptions/onboarding", async (req, res) => {
+  const { userId, email, stripePaymentMethodId } = req.body as {
+    userId: string;
+    email?: string;
+    stripePaymentMethodId?: string;
+  };
+
+  if (!userId) {
+    return res.status(400).json({ error: "userId required" });
+  }
+
+  const [existingSub] = await db
+    .select()
+    .from(subscriptionsTable)
+    .where(eq(subscriptionsTable.userId, userId))
+    .limit(1);
+
+  if (
+    existingSub &&
+    existingSub.plan === "onboarding" &&
+    existingSub.status === "active" &&
+    existingSub.currentPeriodEnd &&
+    existingSub.currentPeriodEnd > new Date()
+  ) {
+    return res.status(409).json({
+      error: "Onboarding access is already active",
+      subscription: existingSub,
+      features: planFeatures(existingSub.plan),
+    });
+  }
+
+  try {
+    const customer = await ensureStripeCustomer({
+      userId,
+      email: email ?? existingSub?.billingEmail ?? undefined,
+      existingCustomerId: existingSub?.stripeCustomerId,
+    });
+
+    let stripeCustomerId = customer.id;
+    let stripeDefaultPaymentMethodId = existingSub?.stripeDefaultPaymentMethodId ?? null;
+    let oneTimeChargeId: string | null = null;
+    let chargePaymentMethodId = stripePaymentMethodId ?? stripeDefaultPaymentMethodId;
+
+    if (!chargePaymentMethodId && process.env.STRIPE_SECRET_KEY) {
+      return res.status(400).json({
+        error: "Payment method required for onboarding fee",
+        detail: "Please provide a Stripe payment method ID or save one during setup.",
+      });
+    }
+
+    if (chargePaymentMethodId || !process.env.STRIPE_SECRET_KEY) {
+      const paymentMethodId = chargePaymentMethodId ?? "demo";
+      const charge = await createOneTimeCharge({
+        customerId: stripeCustomerId,
+        paymentMethodId,
+        amountCents: Math.round(ONBOARDING_FEE * 100),
+        currency: "usd",
+        description: "BigBankBonus onboarding fee — 6 months access",
+        userId,
+      });
+      oneTimeChargeId = charge.id;
+      stripeDefaultPaymentMethodId = paymentMethodId;
+    }
+
+    const now = new Date();
+    const trialEnd = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000);
+
+    let sub;
+    if (existingSub) {
+      [sub] = await db
+        .update(subscriptionsTable)
+        .set({
+          plan: "onboarding",
+          status: "active",
+          stripeCustomerId,
+          stripeDefaultPaymentMethodId,
+          billingEmail: email ?? existingSub.billingEmail ?? null,
+          currentPeriodStart: now,
+          currentPeriodEnd: trialEnd,
+          cancelAtPeriodEnd: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptionsTable.userId, userId))
+        .returning();
+    } else {
+      [sub] = await db
+        .insert(subscriptionsTable)
+        .values({
+          userId,
+          plan: "onboarding",
+          status: "active",
+          stripeCustomerId,
+          stripeDefaultPaymentMethodId,
+          billingEmail: email ?? null,
+          currentPeriodStart: now,
+          currentPeriodEnd: trialEnd,
+        })
+        .returning();
+    }
+
+    return res.json({
+      subscription: sub,
+      features: planFeatures("onboarding"),
+      onboardingFeeCharged: Boolean(oneTimeChargeId),
+      oneTimeChargeId,
+      trialEnd,
+    });
+  } catch (error: any) {
+    return res.status(error?.statusCode ?? 500).json({
+      error: error?.message ?? "Failed to complete onboarding billing",
     });
   }
 });
@@ -261,7 +385,7 @@ router.post("/subscriptions/cancel", async (req, res) => {
 
 // ─── Feature gates ────────────────────────────────────────────────────────────
 function planFeatures(plan: string) {
-  const isPro = plan === "monthly" || plan === "annual";
+  const isPro = plan === "monthly" || plan === "annual" || plan === "onboarding";
   return {
     liveDealsLimit: isPro ? null : 5,
     aiAgent: isPro,
@@ -272,6 +396,7 @@ function planFeatures(plan: string) {
     prioritySupport: isPro,
     earlyAccess: plan === "annual",
     accountManager: plan === "annual",
+    onboardingAccess: plan === "onboarding",
   };
 }
 

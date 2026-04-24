@@ -81,11 +81,11 @@ export default function TermsOfService() {
               The Free plan provides access to up to 5 bonus offers and basic tracking features at no cost.
             </p>
 
-            <h3 className="text-lg font-semibold text-slate-200 mb-2 mt-4">4.2 Pro Subscription</h3>
+            <h3 className="text-lg font-semibold text-slate-200 mb-2 mt-4">4.2 Onboarding & Pro Access</h3>
             <p>
-              Pro plans are available on a monthly ($9.99/month) or annual ($83.88/year, equivalent to
-              $6.99/month) basis. Pro subscribers receive access to all 200+ live bonus offers, the AI
-              Bonus Agent, Autopay DD Scheduler, Plaid bank linking, and ROIC/APY Calculator.
+              Early access is available through a one-time $49 onboarding fee that unlocks 6 months of
+              live bonus recommendations, AI strategy guidance, and Autopay DD Scheduler access.
+              After onboarding, users may transition to a recurring Pro plan for continued long-term support.
             </p>
 
             <h3 className="text-lg font-semibold text-slate-200 mb-2 mt-4">4.3 Autopay Service Fee</h3>

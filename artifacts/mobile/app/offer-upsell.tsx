@@ -163,26 +163,40 @@ export default function OfferUpsellScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch top 3 no-min-balance bonuses
+  // Fetch top offers from recommendations
   useEffect(() => {
     const run = async () => {
       try {
         const domain = process.env.EXPO_PUBLIC_DOMAIN;
         const url = domain
-          ? `https://${domain}/api/bonuses/doc?noMinBalance=true&limit=10`
-          : `http://localhost:8080/api/bonuses/doc?noMinBalance=true&limit=10`;
+          ? `https://${domain}/api/recommendations?userId=${encodeURIComponent(user?.id ?? "demo-user")}`
+          : `http://localhost:8080/api/recommendations?userId=${encodeURIComponent(user?.id ?? "demo-user")}`;
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 8000);
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timer);
         const data = await res.json();
-        const all: DoCBonus[] = data.bonuses ?? [];
-        // Filter no-min-balance, sort by bonus amount descending, take top 3
-        const top3 = all
-          .filter(b => b.noMinimumBalance || b.directDepositRequired === 0)
-          .sort((a, b) => b.bonusAmount - a.bonusAmount)
-          .slice(0, 3);
-        setBonuses(top3.length > 0 ? top3 : all.slice(0, 3));
+        if (res.ok && data.personalOffers) {
+          // Map recommendations to DoCBonus format
+          const mapped: DoCBonus[] = data.personalOffers.slice(0, 3).map((offer: any) => ({
+            id: parseInt(offer.id),
+            title: offer.name,
+            bonusAmount: offer.bonusAmount,
+            directDepositRequired: offer.directDepositRequired,
+            noMinimumBalance: true, // Assume for simplicity
+            offerType: offer.category,
+            offerLink: offer.ctaUrl,
+            section: offer.category,
+          }));
+          setBonuses(mapped);
+        } else {
+          // Fallback if recommendations fail
+          setBonuses([
+            { id: 1, title: "SoFi Checking & Savings", bonusAmount: 300, directDepositRequired: 0, noMinimumBalance: true, offerType: "personal_checking", offerLink: "" },
+            { id: 2, title: "Chime Checking", bonusAmount: 100, directDepositRequired: 200, noMinimumBalance: true, offerType: "personal_checking", offerLink: "" },
+            { id: 3, title: "Upgrade Rewards Checking", bonusAmount: 200, directDepositRequired: 1000, noMinimumBalance: true, offerType: "personal_checking", offerLink: "" },
+          ]);
+        }
       } catch {
         // Use fallback offers
         setBonuses([
@@ -195,7 +209,7 @@ export default function OfferUpsellScreen() {
       }
     };
     run();
-  }, []);
+  }, [user]);
 
   const selectedBonus = useMemo(() => bonuses.find(b => b.id === selected), [bonuses, selected]);
 

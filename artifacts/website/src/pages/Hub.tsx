@@ -121,6 +121,14 @@ function PlaidPrimaryCard({ userId }: { userId: string }) {
         const exchangeData = await exchangeRes.json();
         if (exchangeData.success) {
           await fetchItems();
+          // Link Plaid to active autopay schedules
+          try {
+            await fetch(getApiUrl("/autopay/link-plaid"), {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId }),
+            });
+          } catch {}
           alert("Chase Bank (Demo) linked successfully. In production, Plaid securely connects to your real bank.");
         }
       } else if (linkData.link_token) {

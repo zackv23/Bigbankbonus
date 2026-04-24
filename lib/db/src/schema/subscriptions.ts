@@ -5,7 +5,7 @@ import { z } from "zod/v4";
 export const subscriptionsTable = pgTable("subscriptions", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull().unique(),
-  plan: text("plan").notNull().default("free"),        // "free" | "monthly" | "annual"
+  plan: text("plan").notNull().default("free"),        // "free" | "onboarding" | "monthly" | "annual"
   status: text("status").notNull().default("active"),  // "active" | "cancelled" | "past_due" | "trialing"
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
@@ -28,8 +28,10 @@ export type Subscription = typeof subscriptionsTable.$inferSelect;
 // Pricing constants — billing is only triggered after account approval
 export const PLANS = {
   free: { name: "Free", monthlyPrice: 0, annualPrice: 0, annualMonthly: 0 },
+  onboarding: { name: "Onboarding", monthlyPrice: 0, annualPrice: 0, annualMonthly: 0 },
   monthly: { name: "Pro Monthly", monthlyPrice: 6.00, annualPrice: null, annualMonthly: null },
   annual:  { name: "Pro Annual",  monthlyPrice: null, annualPrice: 72.00, annualMonthly: 6.00 },
 } as const;
 
+export const ONBOARDING_FEE = 49;
 export const SERVICE_FEE = 99; // one-time service fee charged on approval

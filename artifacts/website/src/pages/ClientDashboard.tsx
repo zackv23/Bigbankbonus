@@ -47,6 +47,57 @@ interface PlaidItem {
   status: string;
 }
 
+interface Offer {
+  id: string;
+  name: string;
+  bonusAmount: number;
+  directDepositRequired: number;
+  ewsReporting: boolean;
+  noFee: boolean;
+  timeToBonus: number;
+  difficulty: string;
+  category: string;
+  approvalScore: number;
+  requirements: string;
+  roi: string;
+  ctaUrl: string;
+}
+
+interface ScoreCard {
+  label: string;
+  value: number | string;
+  tier: string;
+  guidance: string;
+}
+
+interface OfferCategorySummary {
+  key: string;
+  name: string;
+  headline: string;
+  count: number;
+}
+
+interface Recommendations {
+  subscriptionPlan: string;
+  bankScore: number;
+  totalPlaidBalance: number;
+  scoreCards: ScoreCard[];
+  offerCategories: OfferCategorySummary[];
+  aiSummary: string;
+  stackingCombo: {
+    personal: Offer | null;
+    business: Offer | null;
+    creditCard: Offer | null;
+    projectedTotal: number;
+    description: string;
+  };
+  personalOffers: Offer[];
+  businessOffers: Offer[];
+  creditCardOffers: Offer[];
+  disclaimer: string;
+  generatedAt: string;
+}
+
 // Mock data for the demo
 const mockOffers = [
   { id: 1, bank: "Chase", name: "Total Checking", bonus: 300, requirement: "$500 direct deposit within 90 days", status: "in_progress", progress: 65, dueDate: "2026-06-15", category: "checking" },
@@ -234,15 +285,93 @@ function PlaidLinkCard({ userId }: { userId: string }) {
 
 export default function ClientDashboard() {
   const [user, setUser] = useState<StoredUser | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendations | null>(null);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+  const [recsError, setRecsError] = useState<string | null>(null);
+  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [accountNumber, setAccountNumber] = useState("");
+  const [routingNumber, setRoutingNumber] = useState("");
+  const [creatingSchedule, setCreatingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [scheduleSuccess, setScheduleSuccess] = useState<any>(null);
 
   useEffect(() => {
     const u = getStoredUser();
     setUser(u);
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    const fetchRecs = async () => {
+      setLoadingRecs(true);
+      setRecsError(null);
+      try {
+        const res = await fetch(getApiUrl(`/recommendations?userId=${encodeURIComponent(user.id)}`));
+        const data = await res.json();
+        if (!res.ok) {
+          if (data.code === "NOT_SUBSCRIBED") {
+            setRecsError("Pro subscription required for recommendations");
+          } else if (data.code === "SCORE_TOO_LOW") {
+            setRecsError(`Bank score of 700+ required (current: ${data.bankScore})`);
+          } else {
+            setRecsError(data.error || "Failed to load recommendations");
+          }
+          return;
+        }
+        setRecommendations(data);
+      } catch (err) {
+        setRecsError("Failed to load recommendations");
+      } finally {
+        setLoadingRecs(false);
+      }
+    };
+    fetchRecs();
+  }, [user]);
+
   const handleLogout = () => {
     localStorage.removeItem(USER_STORAGE_KEY);
     window.location.href = "/";
+  };
+
+  const handleSelectOffer = (offer: Offer) => {
+    setSelectedOffer(offer);
+    setModalVisible(true);
+  };
+
+  const handleCreateSchedule = async () => {
+    if (!selectedOffer || !user) return;
+    setCreatingSchedule(true);
+    setScheduleError(null);
+    try {
+      const res = await fetch(getApiUrl("/autopay/create"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          bonusGuid: selectedOffer.id,
+          bankName: selectedOffer.name,
+          bonusAmount: selectedOffer.bonusAmount,
+          offerLink: selectedOffer.ctaUrl,
+          section: selectedOffer.category,
+          accountNumber,
+          routingNumber,
+          stripePaymentMethodId: "demo",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create schedule");
+      setScheduleSuccess(data);
+      setModalVisible(false);
+      // Reset form
+      setAccountNumber("");
+      setRoutingNumber("");
+      setSelectedOffer(null);
+    } catch (err: any) {
+      setScheduleError(err.message);
+    } finally {
+      setCreatingSchedule(false);
+    }
   };
 
   const totalEarned = mockOffers.filter(o => o.status === "completed").reduce((s, o) => s + o.bonus, 0);
@@ -332,37 +461,96 @@ export default function ClientDashboard() {
               </div>
             </section>
 
-            {/* Top 5 Stacked Bonuses from Doctor of Credit */}
+            {/* Top Offers */}
             <section>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-950">Top Stacked Bonuses</h2>
+                  <h2 className="text-xl font-bold text-slate-950">Top Offers</h2>
                   <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3" /> Updated hourly via Doctor of Credit
+                    <RefreshCw className="w-3 h-3" /> Personalized recommendations
                   </p>
                 </div>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                {mockTopBonuses.map((b, i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition">
-                    <div className="w-10 h-10 rounded-xl bg-slate-950 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                      {b.bank.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-slate-950">{b.bank}</p>
-                        <span className="text-xs text-slate-400">{b.type}</span>
+              {loadingRecs ? (
+                <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
+                  <RefreshCw className="w-8 h-8 text-slate-400 mx-auto mb-4 animate-spin" />
+                  <p className="text-slate-500">Loading recommendations...</p>
+                </div>
+              ) : recsError ? (
+                <div className="bg-amber-50 rounded-2xl border border-amber-200 p-6 shadow-sm">
+                  <p className="text-amber-800">{recsError}</p>
+                  <p className="text-sm text-amber-600 mt-2">Upgrade to Pro or complete onboarding to access personalized offers.</p>
+                </div>
+              ) : recommendations ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-3 mb-4">
+                    {recommendations.offerCategories.map(category => (
+                      <div key={category.key} className="bg-slate-50 rounded-2xl border border-slate-200 p-4">
+                        <p className="text-xs uppercase tracking-[0.15em] text-slate-400">{category.name}</p>
+                        <p className="mt-2 font-semibold text-slate-950">{category.headline}</p>
+                        <p className="text-sm text-slate-500 mt-2">{category.count} recommended offers</p>
                       </div>
-                      <p className="text-xs text-slate-500 truncate">{b.requirement}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-lg font-bold text-emerald-600">${b.bonus.toLocaleString()}</p>
-                      <p className="text-[10px] text-slate-400">{b.source}</p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                    ))}
                   </div>
-                ))}
-              </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3 mb-4">
+                    {recommendations.scoreCards.map(card => (
+                      <div key={card.label} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                        <p className="text-xs uppercase tracking-[0.15em] text-slate-400">{card.label}</p>
+                        <p className="mt-2 text-xl font-semibold text-slate-950">{typeof card.value === "number" ? `$${card.value.toLocaleString()}` : card.value}</p>
+                        <p className="text-sm text-slate-500 mt-2">{card.tier}</p>
+                        <p className="text-xs text-slate-400 mt-3">{card.guidance}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                    <p className="text-sm text-slate-500 mb-3">Strategy summary</p>
+                    <p className="text-sm text-slate-700 leading-relaxed">{recommendations.aiSummary}</p>
+                  </div>
+
+                  {[
+                    { title: "Personal Banking", offers: recommendations.personalOffers },
+                    { title: "Business Banking", offers: recommendations.businessOffers },
+                    { title: "Rewards Cards", offers: recommendations.creditCardOffers },
+                  ].map((section) => (
+                    <div key={section.title} className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-slate-950">{section.title}</h3>
+                        <span className="text-xs text-slate-400">{section.offers.length} offers</span>
+                      </div>
+                      <div className="grid gap-3">
+                        {section.offers.map((offer) => (
+                          <div key={offer.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-slate-950 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                {offer.name.charAt(0)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-slate-950">{offer.name}</p>
+                                  <span className="text-xs text-slate-400">{offer.category}</span>
+                                </div>
+                                <p className="text-xs text-slate-500 truncate">{offer.requirements}</p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="text-lg font-bold text-emerald-600">${offer.bonusAmount.toLocaleString()}</p>
+                                <p className="text-[10px] text-slate-400">{offer.roi} ROI</p>
+                              </div>
+                              <button
+                                onClick={() => handleSelectOffer(offer)}
+                                className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition"
+                              >
+                                Automate
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </section>
 
             {/* Upcoming Payouts */}
@@ -391,21 +579,33 @@ export default function ClientDashboard() {
             <PlaidLinkCard userId={user.id} />
 
             {/* Subscription Status */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
                   <CreditCard className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-950">Subscription</h3>
-                  <p className="text-xs text-slate-500">$49/mo Pro Plan</p>
+                  <p className="text-xs text-slate-500">
+                    {recommendations?.subscriptionPlan === "onboarding"
+                      ? "Onboarding access — 6 months"
+                      : recommendations?.subscriptionPlan === "annual"
+                      ? "Pro Annual"
+                      : recommendations?.subscriptionPlan === "monthly"
+                      ? "Pro Monthly"
+                      : "$49 one-time onboarding"}
+                  </p>
                 </div>
               </div>
               <div className="bg-emerald-50 rounded-xl p-3 flex items-center gap-2 mb-3">
                 <CheckCircle className="w-4 h-4 text-emerald-600" />
                 <span className="text-sm font-medium text-emerald-700">Active</span>
               </div>
-              <p className="text-xs text-slate-400">Next billing: May 12, 2026</p>
+              <p className="text-xs text-slate-400">
+                {recommendations?.subscriptionPlan === "onboarding"
+                  ? "Your onboarding access expires in 6 months."
+                  : "Next billing: May 12, 2026"}
+              </p>
             </div>
 
             {/* Credit Score Monitor */}
@@ -465,6 +665,91 @@ export default function ClientDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Autopay Checkout Modal */}
+      {modalVisible && selectedOffer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-slate-950">Automate {selectedOffer.name}</h3>
+                <button onClick={() => setModalVisible(false)} className="text-slate-400 hover:text-slate-600">
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-sm text-slate-600">Bonus: <span className="font-semibold text-emerald-600">${selectedOffer.bonusAmount.toLocaleString()}</span></p>
+                <p className="text-sm text-slate-600">Requirements: {selectedOffer.requirements}</p>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Account Number</label>
+                  <input
+                    type="text"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="Enter account number"
+                    maxLength={17}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Routing Number</label>
+                  <input
+                    type="text"
+                    value={routingNumber}
+                    onChange={(e) => setRoutingNumber(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="9-digit routing number"
+                    maxLength={9}
+                  />
+                </div>
+              </div>
+
+              {scheduleError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <p className="text-red-800 text-sm">{scheduleError}</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleCreateSchedule}
+                disabled={creatingSchedule || accountNumber.length < 4 || routingNumber.length !== 9}
+                className="w-full py-3 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {creatingSchedule ? "Creating Schedule..." : "Start Automation"}
+              </button>
+
+              <p className="text-xs text-slate-500 mt-3 text-center">
+                Your card will be charged and refunded automatically. You keep the bonus.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {scheduleSuccess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-950 mb-2">Automation Started!</h3>
+              <p className="text-slate-600 mb-4">Schedule #{scheduleSuccess.schedule?.id} created for {selectedOffer?.name}</p>
+              <button
+                onClick={() => setScheduleSuccess(null)}
+                className="w-full py-3 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

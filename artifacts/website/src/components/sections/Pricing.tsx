@@ -88,11 +88,11 @@ export function Pricing() {
               </div>
               <div className="mb-4">
                 <div className="flex items-end gap-2">
-                  <span className="text-5xl font-display font-bold text-white">$6</span>
-                  <span className="text-slate-400 font-medium mb-1">/mo</span>
+                  <span className="text-5xl font-display font-bold text-white">$49</span>
+                  <span className="text-slate-400 font-medium mb-1">one-time</span>
                 </div>
-                <p className="text-brand-pink text-sm mt-1 font-medium">+ $99 one-time service fee</p>
-                <p className="text-slate-500 text-xs mt-1">Both charged only after account approval</p>
+                <p className="text-brand-pink text-sm mt-1 font-medium">Unlocks 6 months of onboarding access</p>
+                <p className="text-slate-500 text-xs mt-1">Charged once after account approval</p>
               </div>
               
               <ul className="space-y-4 mb-8 flex-1">
@@ -152,7 +152,7 @@ export function Pricing() {
               { step: "1", text: "Sign up for free — no credit card, no commitment." },
               { step: "2", text: "Apply for a bank account through the app." },
               { step: "3", text: "A BigBankBonus operator reviews and approves your account." },
-              { step: "4", text: "Once approved, your $6/mo subscription and $99 service fee are activated." },
+              { step: "4", text: "Once approved, your $49 onboarding fee is charged and 6 months of access begins." },
             ].map(item => (
               <div key={item.step} className="flex items-start gap-4">
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-purple to-brand-pink text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">

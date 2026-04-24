@@ -7,9 +7,11 @@ const STRIPE_API_VERSION = "2026-02-25.clover";
 export const PRICE_IDS = {
   monthly: process.env.STRIPE_PRICE_MONTHLY ?? "price_monthly_demo",
   annual: process.env.STRIPE_PRICE_ANNUAL ?? "price_annual_demo",
+  onboarding: process.env.STRIPE_PRICE_ONBOARDING ?? "price_onboarding_demo",
 } as const;
 
 export const SERVICE_FEE = 99.0;
+export const ONBOARDING_FEE = 49.0;
 
 type StripePrimitive = string | number | boolean | null | undefined;
 type StripeFormBody = Record<string, StripePrimitive>;
@@ -128,6 +130,11 @@ type StripeEphemeralKey = {
   secret: string;
 };
 
+type StripePaymentIntent = {
+  id: string;
+  status: string;
+};
+
 export async function ensureStripeCustomer(params: {
   userId: string;
   email?: string;
@@ -175,6 +182,38 @@ export async function attachAndSetDefaultPaymentMethod(
 
   await stripePost(`/customers/${customerId}`, {
     "invoice_settings[default_payment_method]": paymentMethodId,
+  });
+}
+
+export async function createOneTimeCharge(params: {
+  customerId: string;
+  paymentMethodId: string;
+  amountCents: number;
+  currency: string;
+  description: string;
+  userId: string;
+}) {
+  if (!isStripeEnabled()) {
+    return {
+      id: `demo_charge_${params.userId}_${Date.now()}`,
+      status: "succeeded",
+    };
+  }
+
+  await attachAndSetDefaultPaymentMethod(
+    params.customerId,
+    params.paymentMethodId,
+  );
+
+  return stripePost<StripePaymentIntent>('/payment_intents', {
+    amount: params.amountCents,
+    currency: params.currency,
+    customer: params.customerId,
+    payment_method: params.paymentMethodId,
+    off_session: 'true',
+    confirm: 'true',
+    description: params.description,
+    'metadata[userId]': params.userId,
   });
 }
 
