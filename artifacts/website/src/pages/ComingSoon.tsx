@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, ArrowRight, Zap, Shield, TrendingUp } from "lucide-react";
+import { Zap, Shield, TrendingUp } from "lucide-react";
 
 interface Countdown {
   days: number;
@@ -68,21 +68,44 @@ function CountdownTimer() {
 export default function ComingSoon() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    setErrorMessage(null);
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      setErrorMessage("Please enter your email address.");
+      return;
+    }
 
     setLoading(true);
-    // Simulate email capture (in production, integrate with your email service)
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setSubscribed(true);
-    setEmail("");
-    setLoading(false);
 
-    // Reset message after 5 seconds
-    setTimeout(() => setSubscribed(false), 5000);
+    try {
+      const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+      const response = await fetch(`${base}/api/waitlist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error ?? "Unable to join the waitlist.");
+      }
+
+      setSubscribed(true);
+      setWaitlistCount(typeof result.waitlistCount === "number" ? result.waitlistCount : null);
+      setEmail("");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to join the waitlist.");
+    } finally {
+      setLoading(false);
+      setTimeout(() => setSubscribed(false), 5000);
+    }
   };
 
   return (
@@ -142,12 +165,18 @@ export default function ComingSoon() {
                 disabled={loading}
                 className="px-6 py-3 rounded-xl bg-gradient-to-r from-brand-purple to-brand-pink text-white font-semibold hover:opacity-90 disabled:opacity-50 transition flex items-center gap-2 whitespace-nowrap"
               >
-                {loading ? "..." : <>Notify Me</>}
+                {loading ? "..." : <>Join Waitlist</>}
               </button>
             </div>
+            {errorMessage && (
+              <p className="text-sm text-rose-400 text-center font-medium">
+                {errorMessage}
+              </p>
+            )}
             {subscribed && (
               <p className="text-sm text-emerald-400 text-center font-medium">
-                ✓ Thanks! We'll email you when we launch.
+                ✓ You're on the waitlist!
+                {waitlistCount !== null && ` ${waitlistCount.toLocaleString()} people are waiting too.`}
               </p>
             )}
           </form>

@@ -15,6 +15,7 @@ import webhooksRouter from "./webhooks";
 import statementRouter from "./statement";
 import salesRouter from "./sales";
 import ownerRouter from "./owner";
+import waitlistRouter from "./waitlist";
 
 const router: IRouter = Router();
 
@@ -25,6 +26,7 @@ router.use(plaidRouter);
 router.use(autopayRouter);
 router.use(subscriptionsRouter);
 router.use(authRouter);
+router.use(waitlistRouter);
 router.use(monitorRouter);
 router.use(storageRouter);
 router.use(uploadsRouter);
